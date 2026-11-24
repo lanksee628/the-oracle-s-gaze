@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neural Particle Tree - Digital Traces Detected</title>
+  <!-- 引入具有古典锐利雕刻感与华丽衬线气质的字体 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts-d-gstatic-d-com-s-gmn.tuangouai.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #020308;
+      font-family: 'Cinzel', 'Cinzel Decorative', Georgia, serif;
+      color: #c8d2e6;
+    }
+
+    /* 3D 空间透视容器 */
+    #scene-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      perspective: 950px;
+      overflow: hidden;
+      background: radial-gradient(circle at 55% 48%, #070b1a 0%, #020308 75%, #010104 100%);
+    }
+
+    /* 3D 视差舞台：多层 Z 轴景深结构 */
+    #parallax-stage {
+      position: absolute;
+      inset: 0;
+      transform-style: preserve-3d;
+      transition: transform 0.16s ease-out;
+      z-index: 2;
+    }
+
+    /* 3D 空间深度网格光晕与体积雾，消除平面感 */
+    .spatial-depth-halo {
+      position: absolute;
+      inset: -8%;
+      transform: translateZ(-140px) scale(1.16);
+      background:
+        radial-gradient(ellipse at 58% 45%, rgba(95, 65, 190, 0.14) 0%, transparent 52%),
+        radial-gradient(ellipse at 55% 75%, rgba(0, 195, 235, 0.12) 0%, transparent 48%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* 远景虚化景深层（增强纵深立体感） */
+    #depth-back-canvas {
+      z-index: 1;
+      transform: translateZ(-55px) scale(1.06);
+      opacity: 0.42;
+      filter: blur(2.2px);
+    }
+
+    /* 主粒子树层 */
+    #tree-canvas {
+      z-index: 2;
+      transform: translateZ(0px);
+    }
+
+    /* 前景立体粒子浮层（向屏幕前方凸出，产生强烈3D空间层次） */
+    #depth-front-canvas {
+      z-index: 3;
+      transform: translateZ(38px) scale(0.965);
+      pointer-events: none;
+    }
+
+    /* 屏幕边缘微暗角（仅作用于视觉背景层，绝不遮挡文字） */
+    .vignette-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 58% 48%, transparent 56%, rgba(1, 2, 6, 0.62) 100%);
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    /* 左下角 UI 面板：置于最高层级，带极其通透的局部暗调衬底保证文字100%完整清晰不被任何光线遮挡 */
+    #hud-panel {
+      position: absolute;
+      left: 3.8vw;
+      bottom: 4.8vh;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: max-content;
+      max-width: calc(100vw - 7.6vw);
+      padding: 18px 24px 20px 20px;
+      border-radius: 6px;
+      background: radial-gradient(ellipse at 25% 50%, rgba(2, 4, 12, 0.68) 0%, rgba(2, 4, 12, 0.25) 75%, transparent 100%);
+      pointer-events: none;
+      cursor: pointer;
+      /* 初始完全隐藏，等待图片与粒子效果先呈现后缓慢浮现 */
+      opacity: 0;
+      transform: translateY(26px);
+      filter: blur(6px);
+      transition:
+        opacity 2.6s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 2.6s cubic-bezier(0.16, 1, 0.3, 1),
+        filter 2.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    #hud-panel.hud-visible {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0px);
+      pointer-events: auto;
+    }
+
+    /* 金属暗黑浮雕锐利质感 + 边缘轻微青白色发光效果 */
+    .engraved-metal {
+      font-family: 'Cinzel', 'Cinzel Decorative', serif;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      background: linear-gradient(
+        180deg,
+        #ffffff 0%,
+        #d8e6f8 32%,
+        #8897b2 62%,
+        #e5f0ff 85%,
+        #6d7b96 100%
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      /* 暗黑雕刻浮雕投影 + 边缘轻微青白色发光 */
+      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.98))
+              drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.26))
+              drop-shadow(0 0 6px rgba(175, 245, 255, 0.38));
+      transition: color 0.35s ease, text-shadow 0.35s ease, opacity 0.35s ease, filter 0.35s ease;
+      cursor: pointer;
+    }
+
+    /* 鼠标悬停时：链接文本变为青色，并产生青色发光阴影与透明度渐变动画 */
+    .hover-cyan {
+      position: relative;
+      display: inline-block;
+      transition: all 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .hover-cyan:hover {
+      background: none;
+      -webkit-background-clip: initial;
+      background-clip: initial;
+      color: #4dfcff;
+      text-shadow:
+        0 0 8px rgba(77, 252, 255, 0.92),
+        0 0 18px rgba(0, 212, 255, 0.68),
+        0 0 32px rgba(0, 180, 255, 0.48);
+      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.95));
+      animation: cyanPulseFade 1.6s ease-in-out infinite alternate;
+    }
+
+    @keyframes cyanPulseFade {
+      0% {
+        opacity: 0.78;
+        text-shadow:
+          0 0 6px rgba(77, 252, 255, 0.7),
+          0 0 14px rgba(0, 212, 255, 0.5);
+      }
+      100% {
+        opacity: 1;
+        text-shadow:
+          0 0 10px rgba(120, 255, 255, 1),
+          0 0 22px rgba(0, 230, 255, 0.85),
+          0 0 38px rgba(0, 190, 255, 0.55);
+      }
+    }
+
+    /* 主标题：单行完整显示 DIGITAL TRACES DETECTED，不被裁剪或遮挡 */
+    .hud-title {
+      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-weight: 900;
+      font-size: clamp(18px, 2.05vw, 30px);
+      line-height: 1.3;
+      letter-spacing: 0.14em;
+      white-space: nowrap;
+      padding-right: 6px;
+    }
+
+    /* 副标题：Analyzing.. */
+    .hud-subtitle {
+      font-weight: 600;
+      font-size: clamp(14px, 1.2vw, 18px);
+      letter-spacing: 0.22em;
+      margin-top: -4px;
+      opacity: 0.95;
+      white-space: nowrap;
+    }
+
+    /* 青色发光卡顿进度条 */
+    .progress-wrapper {
+      width: 310px;
+      max-width: 100%;
+      height: 7px;
+      background: rgba(10, 18, 32, 0.9);
+      border: 1px solid rgba(77, 252, 255, 0.36);
+      box-shadow:
+        inset 0 1px 3px rgba(0, 0, 0, 0.95),
+        0 0 12px rgba(0, 225, 255, 0.2);
+      position: relative;
+      overflow: hidden;
+      margin: 2px 0 6px 0;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #007799 0%, #00e5ff 65%, #b8ffff 100%);
+      box-shadow:
+        0 0 8px #00f0ff,
+        0 0 16px rgba(0, 240, 255, 0.8),
+        0 0 24px rgba(0, 240, 255, 0.5);
+      position: relative;
+      transition: width 0.16s steps(2, end);
+    }
+
+    .progress-bar-fill::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: -2px;
+      width: 6px;
+      height: 11px;
+      background: #ffffff;
+      box-shadow: 0 0 10px #4dfcff, 0 0 18px #ffffff;
+    }
+
+    /* 指标列表：完整显示所有文字与百分比 */
+    .metrics-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      margin-top: 2px;
+      border-left: 1px solid rgba(165, 215, 245, 0.36);
+      padding-left: 16px;
+      overflow: visible;
+    }
+
+    .metric-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 300px;
+      max-width: 100%;
+      font-size: clamp(14px, 1.15vw, 17.5px);
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      white-space: nowrap;
+      overflow: visible;
+    }
+
+    .metric-label {
+      flex: 1;
+      padding-right: 16px;
+    }
+
+    .metric-value {
+      font-variant-numeric: tabular-nums;
+      min-width: 58px;
+      text-align: right;
+    }
+
+    /* 加载状态提示 */
+    #loading-badge {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      z-index: 20;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: rgba(160, 240, 255, 0.78);
+      text-shadow: 0 0 8px rgba(0, 220, 255, 0.45);
+      pointer-events: none;
+      transition: opacity 0.6s ease;
+    }
+  </style>
+</head>
+<body>
+  <div id="scene-container">
+    <div id="parallax-stage">
+      <!-- 3D 空间深度光晕 -->
+      <div class="spatial-depth-halo"></div>
+      <!-- 远景景深模糊层 -->
+      <canvas id="depth-back-canvas"></canvas>
+      <!-- 全画布主粒子树与向上环形脉冲画布 -->
+      <canvas id="tree-canvas"></canvas>
+      <!-- 前景3D凸出粒子层 -->
+      <canvas id="depth-front-canvas"></canvas>
+    </div>
+
+    <div class="vignette-overlay"></div>
+    <div id="loading-badge">INITIALIZING NEURAL TOPOLOGY...</div>
+
+    <!-- 左下角 UI 文本与进度模块：
+         1. 图片与脉冲先显示
+         2. text 缓慢浮现
+         3. 进度条开始运行，运行期间百分比保持计算波动，进度条跑完(100%)后再定格显示最终百分比结果 -->
+    <aside id="hud-panel">
+      <div class="hud-title engraved-metal hover-cyan">
+        DIGITAL TRACES DETECTED
+      </div>
+      <div class="hud-subtitle engraved-metal hover-cyan" id="analyzing-text">
+        Analyzing..
+      </div>
+
+      <!-- 青色发光卡顿进度条 -->
+      <div class="progress-wrapper" title="Neural Scan Progress">
+        <div class="progress-bar-fill" id="scan-progress"></div>
+      </div>
+
+      <!-- 指标从上至下排列：进度条跑完后显示最终结果数据 -->
+      <ul class="metrics-list" id="metrics-list">
+        <li class="metric-item engraved-metal hover-cyan" data-target="92">
+          <span class="metric-label">Ambition</span>
+          <span class="metric-value">0%</span>
+        </li>
+        <li class="metric-item engraved-metal hover-cyan" data-target="87">
+          <span class="metric-label">Drive</span>
+          <span class="metric-value">0%</span>
+        </li>
+        <li class="metric-item engraved-metal hover-cyan" data-target="78">
+          <span class="metric-label">Competition</span>
+          <span class="metric-value">0%</span>
+        </li>
+        <li class="metric-item engraved-metal hover-cyan" data-target="71">
+          <span class="metric-label">Pressure</span>
+          <span class="metric-value">0%</span>
+        </li>
+        <li class="metric-item engraved-metal hover-cyan" data-target="63">
+          <span class="metric-label">Security</span>
+          <span class="metric-value">0%</span>
+        </li>
+      </ul>
+    </aside>
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     * 1. 核心可调参数集中配置区 (CONFIGURATION)
+     * ============================================================================
+     */
+    const CONFIG = {
+      // 图片源地址（已自动将 GitHub blob 页面地址转换为可直接加载的 raw 图像地址，并保留回退方案）
+      IMAGE_URLS: [
+        'https://raw.githubusercontent.com/lanksee628/my-image/df4ab174a737f308ce91b175c6996b0d91e3b0c5/page3.png',
+        'https://github.com/lanksee628/my-image/blob/df4ab174a737f308ce91b175c6996b0d91e3b0c5/page3.png?raw=true',
+        './page3.png'
+      ],
+
+      // --- 脉冲光线核心参数（亮度保持柔和不刺眼） ---
+      PULSE_SPEED: 0.22,                 // 脉冲从底部向树梢传播的速度 (归一化进度/秒)
+      PULSE_COUNT: 4,                    // 同时存在的多圈脉冲数量（前后错开时间间隔）
+      PULSE_BAND_WIDTH: 0.085,           // 脉冲发光环带的宽度 (归一化高度比例)
+      PULSE_GLOW_INTENSITY: 0.88,        // 脉冲发光亮度倍率
+
+      // --- 枝干路径提取与粒子控制参数 ---
+      PATH_BRIGHTNESS_THRESHOLD: 88,     // 路径提取亮度阈值 (0~255)，识别亮色主要根部/主干/分支
+      MAX_ACTIVE_BRANCH_PARTICLES: 3200, // 主要枝干动态粒子数量上限
+      STATIC_BREATH_INTENSITY: 0.04,     // 非主干边缘细碎粒子的微弱呼吸幅度
+
+      // --- 鼠标交互参数（较大影响范围、粒子明显放大、间距适中扩大，绝不形成空洞） ---
+      MOUSE_INFLUENCE_RADIUS: 148,       // 鼠标悬停影响的较大范围半径 (px)
+      MOUSE_INFLUENCE_STRENGTH: 0.56,    // 鼠标悬停时粒子放大与间距扩大的适中扰动强度
+      PARTICLE_RECOVERY_SPEED: 0.15,     // 鼠标离开后粒子平滑恢复原状的速度
+
+      // --- 3D 空间感与纵深视差参数 ---
+      ENABLE_3D_PARALLAX: true,          // 3D 空间景深视差开关
+      PARALLAX_DEPTH_ANGLE: 5.2,         // 鼠标微动带来的 3D 立体倾斜角度上限 (deg)
+      DEPTH_SHIFT_PX: 26,                // 前后景深层错位位移像素，增强立体纵深感
+
+      // --- 视觉出场与数据计算时序控制 ---
+      TEXT_REVEAL_DELAY_MS: 1600,        // 先展示图片与脉冲 1.6 秒后再开始缓慢浮现 text
+      TEXT_FADE_IN_DURATION_MS: 2400     // text 缓慢浮现完成后，再启动进度条与百分比计算
+    };
+
+    /**
+     * ============================================================================
+     * 2. DOM 与多层级 3D 画布初始化
+     * ============================================================================
+     */
+    const stage = document.getElementById('parallax-stage');
+    const backCanvas = document.getElementById('depth-back-canvas');
+    const backCtx = backCanvas.getContext('2d');
+    const treeCanvas = document.getElementById('tree-canvas');
+    const treeCtx = treeCanvas.getContext('2d');
+    const frontCanvas = document.getElementById('depth-front-canvas');
+    const frontCtx = frontCanvas.getContext('2d');
+    const loadingBadge = document.getElementById('loading-badge');
+    const hudPanel = document.getElementById('hud-panel');
+
+    // 鼠标左键点击左下角文本跳转 index4.html
+    hudPanel.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      window.location.href = 'index4.html';
+    });
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    // 鼠标状态
+    const mouse = {
+      x: -9999,
+      y: -9999,
+      normX: 0,
+      normY: 0,
+      smoothNormX: 0,
+      smoothNormY: 0,
+      active: false
+    };
+
+    // 核心数据结构
+    let baseTreeOffscreen = null;     // 离屏缓存：铺满整个画布的原图底图
+    let activeBranchParticles = [];   // 提取出的主要枝干动态粒子（带 3D Z 轴深度）
+    let branchMaskCanvas = null;      // 离屏缓存：主枝干发光路径遮罩
+    let treeBounds = { x: 0, y: 0, w: 0, h: 0, topY: 0, bottomY: 0, centerX: 0 };
+    let isReady = false;
+    let hudRevealed = false;
+
+    function resizeCanvases() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      [backCanvas, treeCanvas, frontCanvas].forEach(c => {
+        c.width = width * dpr;
+        c.height = height * dpr;
+        c.style.width = width + 'px';
+        c.style.height = height + 'px';
+      });
+
+      backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      treeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      frontCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      if (loadedSourceImage) {
+        buildTreeTopology(loadedSourceImage);
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 3. 图片加载与分阶段时序触发：
+     *    阶段1：展示图片与脉冲效果
+     *    阶段2：text 缓慢浮现
+     *    阶段3：进度条开始运行 -> 进度条跑完后再完成百分比计算并显示最终结果
+     * ============================================================================
+     */
+    let loadedSourceImage = null;
+
+    function triggerDelayedHudReveal() {
+      if (hudRevealed) return;
+      hudRevealed = true;
+
+      // 阶段 1 -> 阶段 2：先让图片与脉冲运行一段时间，再开始缓慢浮现 text
+      setTimeout(() => {
+        hudPanel.classList.add('hud-visible');
+
+        // 阶段 2 -> 阶段 3：等待 text 缓慢浮现完成后，再启动进度条与百分比计算
+        setTimeout(() => {
+          initHudAnimations();
+        }, CONFIG.TEXT_FADE_IN_DURATION_MS);
+      }, CONFIG.TEXT_REVEAL_DELAY_MS);
+    }
+
+    function loadImageWithFallback(urls, index = 0) {
+      if (index >= urls.length) {
+        loadingBadge.textContent = 'FALLBACK TOPOLOGY GENERATED';
+        setTimeout(() => { loadingBadge.style.opacity = '0'; }, 1400);
+        const fallbackCanvas = createProceduralFallbackTree(1440, 900);
+        loadedSourceImage = fallbackCanvas;
+        buildTreeTopology(fallbackCanvas);
+        isReady = true;
+        triggerDelayedHudReveal();
+        return;
+      }
+
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = () => {
+        loadedSourceImage = img;
+        buildTreeTopology(img);
+        isReady = true;
+        loadingBadge.textContent = 'TOPOLOGY LOCKED';
+        setTimeout(() => { loadingBadge.style.opacity = '0'; }, 1000);
+        triggerDelayedHudReveal();
+      };
+      img.onerror = () => {
+        loadImageWithFallback(urls, index + 1);
+      };
+      img.src = urls[index];
+    }
+
+    /**
+     * 备用兜底：仅在完全离线且无本地 page3.png 时触发，保证直接运行不白屏
+     */
+    function createProceduralFallbackTree(w, h) {
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#020308';
+      ctx.fillRect(0, 0, w, h);
+
+      function drawBranch(x, y, len, angle, depth, widthScale) {
+        if (depth <= 0) return;
+        const nx = x + Math.cos(angle) * len;
+        const ny = y + Math.sin(angle) * len;
+        const steps = Math.floor(len / 3);
+        for (let i = 0; i < steps; i++) {
+          const t = i / steps;
+          const px = x + (nx - x) * t + (Math.random() - 0.5) * widthScale * 7;
+          const py = y + (ny - y) * t + (Math.random() - 0.5) * widthScale * 7;
+          ctx.fillStyle = depth > 5
+            ? 'rgba(130, 245, 255, 0.78)'
+            : (depth > 3 ? 'rgba(195, 145, 255, 0.58)' : 'rgba(245, 185, 235, 0.38)');
+          ctx.beginPath();
+          ctx.arc(px, py, Math.random() * 1.9 + 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        drawBranch(nx, ny, len * 0.78, angle - 0.3 + (Math.random() - 0.5) * 0.1, depth - 1, widthScale * 0.75);
+        drawBranch(nx, ny, len * 0.78, angle + 0.3 + (Math.random() - 0.5) * 0.1, depth - 1, widthScale * 0.75);
+      }
+      drawBranch(w * 0.54, h * 0.9, 175, -Math.PI / 2, 8, 2.6);
+      drawBranch(w * 0.54, h * 0.88, 130, Math.PI * 0.8, 5, 1.8);
+      drawBranch(w * 0.54, h * 0.88, 130, Math.PI * 0.2, 5, 1.8);
+      return c;
+    }
+
+    /**
+     * ============================================================================
+     * 4. 全画布填充、3D 景深层构建与枝干路径提取
+     * ============================================================================
+     */
+    function buildTreeTopology(imgSource) {
+      const imgW = imgSource.width;
+      const imgH = imgSource.height;
+
+      // 使用 cover 策略让图片完整填充整个画布
+      const scale = Math.max(width / imgW, height / imgH);
+      const drawW = Math.round(imgW * scale);
+      const drawH = Math.round(imgH * scale);
+      const drawX = Math.round((width - drawW) * 0.5);
+      const drawY = Math.round((height - drawH) * 0.5);
+
+      treeBounds = {
+        x: drawX,
+        y: drawY,
+        w: drawW,
+        h: drawH,
+        centerX: drawX + drawW * 0.5,
+        topY: Math.max(0, drawY + drawH * 0.04),
+        bottomY: Math.min(height, drawY + drawH * 0.96)
+      };
+
+      // 1) 构建铺满整个画布的静态原图底图缓存
+      baseTreeOffscreen = document.createElement('canvas');
+      baseTreeOffscreen.width = width;
+      baseTreeOffscreen.height = height;
+      const baseCtx = baseTreeOffscreen.getContext('2d');
+      baseCtx.clearRect(0, 0, width, height);
+      baseCtx.drawImage(imgSource, drawX, drawY, drawW, drawH);
+
+      // 2) 绘制远景景深虚化层，与主层形成 Z 轴纵深叠加
+      backCtx.clearRect(0, 0, width, height);
+      backCtx.drawImage(baseTreeOffscreen, 0, 0);
+
+      // 3) 采样像素提取主要枝干路径骨架
+      const sampleScale = 0.45;
+      const sW = Math.max(160, Math.round(width * sampleScale));
+      const sH = Math.max(120, Math.round(height * sampleScale));
+
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = sW;
+      sampleCanvas.height = sH;
+      const sCtx = sampleCanvas.getContext('2d');
+      sCtx.drawImage(baseTreeOffscreen, 0, 0, sW, sH);
+
+      let imgData;
+      try {
+        imgData = sCtx.getImageData(0, 0, sW, sH).data;
+      } catch (e) {
+        console.warn('Canvas pixel read restricted, using structural fallback.');
+        return;
+      }
+
+      // 准备主枝干遮罩画布
+      branchMaskCanvas = document.createElement('canvas');
+      branchMaskCanvas.width = width;
+      branchMaskCanvas.height = height;
+      const maskCtx = branchMaskCanvas.getContext('2d');
+      maskCtx.clearRect(0, 0, width, height);
+
+      const candidates = [];
+      let minTreeY = sH;
+      let maxTreeY = 0;
+
+      const step = 2;
+      for (let sy = 2; sy < sH - 2; sy += step) {
+        for (let sx = 2; sx < sW - 2; sx += step) {
+          const idx = (sy * sW + sx) * 4;
+          const r = imgData[idx];
+          const g = imgData[idx + 1];
+          const b = imgData[idx + 2];
+          const a = imgData[idx + 3];
+          if (a < 40) continue;
+
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          if (lum < CONFIG.PATH_BRIGHTNESS_THRESHOLD * 0.55) continue;
+
+          if (sy < minTreeY) minTreeY = sy;
+          if (sy > maxTreeY) maxTreeY = sy;
+
+          let neighborLumSum = 0;
+          let brightNeighbors = 0;
+          for (let dy = -2; dy <= 2; dy += 2) {
+            for (let dx = -2; dx <= 2; dx += 2) {
+              const nIdx = ((sy + dy) * sW + (sx + dx)) * 4;
+              const nLum = 0.299 * imgData[nIdx] + 0.587 * imgData[nIdx + 1] + 0.114 * imgData[nIdx + 2];
+              neighborLumSum += nLum;
+              if (nLum >= CONFIG.PATH_BRIGHTNESS_THRESHOLD * 0.75) brightNeighbors++;
+            }
+          }
+          const avgNeighborLum = neighborLumSum / 9;
+
+          if (lum >= CONFIG.PATH_BRIGHTNESS_THRESHOLD && brightNeighbors >= 4) {
+            const worldX = (sx / sW) * width;
+            const worldY = (sy / sH) * height;
+            const normX = sx / sW;
+            const normY = sy / sH;
+
+            let tier = 1;
+            const distFromCenter = Math.abs(normX - 0.5);
+            if (normY > 0.70 && distFromCenter < 0.38) {
+              tier = 1; // 底部左右根部
+            } else if (normY >= 0.40 && normY <= 0.70 && distFromCenter < 0.20) {
+              tier = 1; // 中间大主干
+            } else if (normY >= 0.16 && normY < 0.40 && distFromCenter < 0.38) {
+              tier = 2; // 上方主要分叉
+            } else {
+              tier = 3; // 外围细梢
+            }
+
+            candidates.push({
+              x: worldX,
+              y: worldY,
+              normX,
+              normY,
+              lum,
+              avgNeighborLum,
+              tier,
+              r,
+              g,
+              b
+            });
+          }
+        }
+      }
+
+      if (maxTreeY > minTreeY) {
+        treeBounds.topY = (minTreeY / sH) * height;
+        treeBounds.bottomY = (maxTreeY / sH) * height;
+      }
+
+      candidates.sort((a, b) => {
+        const scoreA = a.avgNeighborLum * (a.tier === 1 ? 1.35 : a.tier === 2 ? 1.05 : 0.75);
+        const scoreB = b.avgNeighborLum * (b.tier === 1 ? 1.35 : b.tier === 2 ? 1.05 : 0.75);
+        return scoreB - scoreA;
+      });
+
+      const selected = candidates.slice(0, CONFIG.MAX_ACTIVE_BRANCH_PARTICLES);
+      const spanY = Math.max(1, treeBounds.bottomY - treeBounds.topY);
+
+      maskCtx.save();
+      maskCtx.filter = 'blur(3.5px)';
+      for (let i = 0; i < selected.length; i++) {
+        const p = selected[i];
+        const radius = p.tier === 1 ? 7.2 : (p.tier === 2 ? 4.8 : 3.0);
+        const alpha = p.tier === 1 ? 0.52 : (p.tier === 2 ? 0.36 : 0.20);
+        maskCtx.fillStyle = `rgba(210, 195, 255, ${alpha})`;
+        maskCtx.beginPath();
+        maskCtx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        maskCtx.fill();
+      }
+      maskCtx.restore();
+
+      // 4) 构建带有 3D 纵深层级 (zDepth) 的主干与前景立体粒子
+      activeBranchParticles = selected.map((p, idx) => {
+        const heightProgress = Math.min(1, Math.max(0, (treeBounds.bottomY - p.y) / spanY));
+        const radialOffset = Math.abs(p.normX - 0.5) * (heightProgress < 0.25 ? -0.06 : 0.08);
+        const pathProgress = Math.min(1, Math.max(0, heightProgress - radialOffset));
+
+        // 为粒子分配 3D 纵深权重：主干最靠前凸出，分支居中，末梢有前后错落立体感
+        const isForegroundNode = (idx % 5 === 0) && (p.tier <= 2);
+        const zDepth = isForegroundNode
+          ? (0.65 + Math.random() * 0.45)
+          : (p.tier === 1 ? 0.35 : (p.tier === 2 ? 0.15 : -0.15)) + (Math.random() - 0.5) * 0.25;
+
+        return {
+          baseX: p.x,
+          baseY: p.y,
+          x: p.x,
+          y: p.y,
+          baseSize: p.tier === 1 ? (1.5 + Math.random() * 0.85) : (1.15 + Math.random() * 0.65),
+          currentSize: 1.35,
+          pathProgress,
+          tier: p.tier,
+          zDepth,
+          isForegroundNode,
+          phase: Math.random() * Math.PI * 2,
+          color: p.tier === 1
+            ? 'rgba(210, 242, 255, '
+            : (p.r > p.g ? 'rgba(225, 185, 255, ' : 'rgba(170, 235, 255, ')
+        };
+      });
+    }
+
+    /**
+     * ============================================================================
+     * 5. 核心渲染循环：3D 纵深多层渲染 + 柔和环形脉冲光带 + 鼠标交互
+     * ============================================================================
+     */
+    const pulseBuffer = document.createElement('canvas');
+    const pulseBufCtx = pulseBuffer.getContext('2d');
+
+    function renderTreeAndPulses(timeSec) {
+      treeCtx.clearRect(0, 0, width, height);
+      frontCtx.clearRect(0, 0, width, height);
+      if (!isReady || !baseTreeOffscreen) return;
+
+      // 平滑更新 3D 空间视差偏移量
+      mouse.smoothNormX += (mouse.normX - mouse.smoothNormX) * 0.08;
+      mouse.smoothNormY += (mouse.normY - mouse.smoothNormY) * 0.08;
+
+      const shiftX = mouse.smoothNormX * CONFIG.DEPTH_SHIFT_PX;
+      const shiftY = mouse.smoothNormY * CONFIG.DEPTH_SHIFT_PX;
+
+      // 更新远景景深层的反向微移，形成强烈的 3D 立体空间纵深
+      backCanvas.style.transform = `translate3d(${(-shiftX * 0.65).toFixed(1)}px, ${(-shiftY * 0.65).toFixed(1)}px, -55px) scale(1.06)`;
+      frontCanvas.style.transform = `translate3d(${(shiftX * 0.55).toFixed(1)}px, ${(shiftY * 0.55).toFixed(1)}px, 38px) scale(0.965)`;
+
+      // 1) 绘制铺满画布的静态原图粒子树底图
+      const subtleBreath = 0.96 + Math.sin(timeSec * 1.3) * CONFIG.STATIC_BREATH_INTENSITY;
+      treeCtx.save();
+      treeCtx.globalAlpha = Math.min(1, subtleBreath);
+      treeCtx.drawImage(baseTreeOffscreen, 0, 0);
+      treeCtx.restore();
+
+      // 计算当前所有周期性环形脉冲的进度位置 (0.0 根部 -> 1.0 枝梢)
+      const pulsePositions = [];
+      for (let k = 0; k < CONFIG.PULSE_COUNT; k++) {
+        const offset = k / CONFIG.PULSE_COUNT;
+        const progress = (timeSec * CONFIG.PULSE_SPEED + offset) % 1.0;
+        pulsePositions.push(progress);
+      }
+
+      // 2) 绘制有宽度的“环形脉冲光带”（柔和淡紫与微白辉光）
+      if (branchMaskCanvas) {
+        if (pulseBuffer.width !== width || pulseBuffer.height !== height) {
+          pulseBuffer.width = width;
+          pulseBuffer.height = height;
+        }
+        pulseBufCtx.clearRect(0, 0, width, height);
+
+        const spanY = Math.max(1, treeBounds.bottomY - treeBounds.topY);
+        const bandPx = spanY * CONFIG.PULSE_BAND_WIDTH;
+
+        pulseBufCtx.save();
+        for (let k = 0; k < pulsePositions.length; k++) {
+          const p = pulsePositions[k];
+          const edgeFade = Math.sin(p * Math.PI);
+          if (edgeFade <= 0.02) continue;
+
+          const centerY = treeBounds.bottomY - p * spanY;
+          const grad = pulseBufCtx.createLinearGradient(0, centerY + bandPx, 0, centerY - bandPx);
+          const alphaCore = Math.min(0.62, 0.42 * edgeFade * CONFIG.PULSE_GLOW_INTENSITY);
+          const alphaHalo = Math.min(0.42, 0.24 * edgeFade * CONFIG.PULSE_GLOW_INTENSITY);
+
+          grad.addColorStop(0.0, 'rgba(180, 125, 250, 0)');
+          grad.addColorStop(0.25, `rgba(190, 140, 250, ${alphaHalo})`);
+          grad.addColorStop(0.50, `rgba(242, 234, 255, ${alphaCore})`);
+          grad.addColorStop(0.75, `rgba(200, 155, 250, ${alphaHalo})`);
+          grad.addColorStop(1.0, 'rgba(180, 125, 250, 0)');
+
+          pulseBufCtx.fillStyle = grad;
+          pulseBufCtx.beginPath();
+          pulseBufCtx.ellipse(
+            treeBounds.centerX,
+            centerY,
+            width * 0.56,
+            bandPx * 1.15,
+            0,
+            0,
+            Math.PI * 2
+          );
+          pulseBufCtx.fill();
+        }
+
+        // 严格裁剪到主要枝干区域内
+        pulseBufCtx.globalCompositeOperation = 'destination-in';
+        pulseBufCtx.drawImage(branchMaskCanvas, 0, 0);
+        pulseBufCtx.restore();
+
+        treeCtx.save();
+        treeCtx.globalCompositeOperation = 'lighter';
+        treeCtx.filter = 'blur(5px)';
+        treeCtx.globalAlpha = 0.78;
+        treeCtx.drawImage(pulseBuffer, 0, 0);
+        treeCtx.filter = 'none';
+        treeCtx.globalAlpha = 0.48;
+        treeCtx.drawImage(pulseBuffer, 0, 0);
+        treeCtx.restore();
+      }
+
+      // 3) 更新并绘制主要枝干动态粒子（分发至中景与3D前景层，增强空间立体感）
+      treeCtx.save();
+      treeCtx.globalCompositeOperation = 'lighter';
+      frontCtx.save();
+      frontCtx.globalCompositeOperation = 'lighter';
+
+      const rLimit = CONFIG.MOUSE_INFLUENCE_RADIUS;
+      const rLimitSq = rLimit * rLimit;
+      const halfBand = CONFIG.PULSE_BAND_WIDTH * 0.65;
+
+      for (let i = 0; i < activeBranchParticles.length; i++) {
+        const pt = activeBranchParticles[i];
+
+        // --- A. 脉冲波纹经过时的温和亮度增强 ---
+        let pulseBoost = 0;
+        for (let k = 0; k < pulsePositions.length; k++) {
+          const diff = Math.abs(pt.pathProgress - pulsePositions[k]);
+          if (diff < halfBand) {
+            const norm = 1 - diff / halfBand;
+            const wave = norm * norm * (3 - 2 * norm);
+            const fade = Math.sin(pulsePositions[k] * Math.PI);
+            pulseBoost = Math.max(pulseBoost, wave * fade);
+          }
+        }
+
+        // --- B. 鼠标悬停交互（较大范围、粒子放大更明显、间距适中扩大，无中心空洞） ---
+        const depthOffsetX = shiftX * pt.zDepth * 0.45;
+        const depthOffsetY = shiftY * pt.zDepth * 0.45;
+
+        let targetX = pt.baseX + depthOffsetX;
+        let targetY = pt.baseY + depthOffsetY;
+        let targetScale = 1 + pulseBoost * 0.42;
+        let hoverIntensity = 0;
+
+        if (mouse.active) {
+          const dx = targetX - mouse.x;
+          const dy = targetY - mouse.y;
+          const distSq = dx * dx + dy * dy;
+
+          if (distSq < rLimitSq && distSq > 0.001) {
+            const dist = Math.sqrt(distSq);
+            const normDist = dist / rLimit;
+
+            // 粒子放大曲线：中心到中环放大明显
+            const sizeFalloff = Math.cos(normDist * Math.PI * 0.5);
+            const smoothSizeWeight = sizeFalloff * sizeFalloff;
+
+            // 间距扩大曲线：sin(normDist * PI) 确保光标中心位移为0不形成空洞，中圈适度均匀扩开
+            const spacingBell = Math.sin(normDist * Math.PI);
+            const maxSpreadPx = 22 * CONFIG.MOUSE_INFLUENCE_STRENGTH;
+            const pushDist = spacingBell * maxSpreadPx;
+
+            targetX += (dx / dist) * pushDist;
+            targetY += (dy / dist) * pushDist;
+            targetScale += smoothSizeWeight * CONFIG.MOUSE_INFLUENCE_STRENGTH * 2.85;
+            hoverIntensity = smoothSizeWeight;
+          }
+        }
+
+        // 平滑插值与离开后的快速平滑恢复
+        pt.x += (targetX - pt.x) * CONFIG.PARTICLE_RECOVERY_SPEED;
+        pt.y += (targetY - pt.y) * CONFIG.PARTICLE_RECOVERY_SPEED;
+        const targetSize = pt.baseSize * targetScale;
+        pt.currentSize += (targetSize - pt.currentSize) * CONFIG.PARTICLE_RECOVERY_SPEED;
+
+        const isHoverAffected = hoverIntensity > 0.02 || Math.abs(pt.x - (pt.baseX + depthOffsetX)) > 0.15;
+
+        // 前景立体节点常驻微光，其余粒子在脉冲或鼠标悬停时点亮
+        if (pulseBoost > 0.04 || isHoverAffected || pt.isForegroundNode) {
+          const baseForegroundAlpha = pt.isForegroundNode ? (0.24 + 0.1 * Math.sin(timeSec * 1.8 + pt.phase)) : 0.10;
+          const alpha = Math.min(
+            0.78,
+            baseForegroundAlpha + pulseBoost * 0.52 * CONFIG.PULSE_GLOW_INTENSITY + hoverIntensity * 0.38
+          );
+
+          const targetCtx = pt.isForegroundNode ? frontCtx : treeCtx;
+          if (pulseBoost > 0.42 || hoverIntensity > 0.55) {
+            targetCtx.fillStyle = `rgba(235, 244, 255, ${(alpha * 0.88).toFixed(3)})`;
+          } else {
+            targetCtx.fillStyle = pt.color + alpha.toFixed(3) + ')';
+          }
+
+          targetCtx.beginPath();
+          targetCtx.arc(pt.x, pt.y, pt.currentSize, 0, Math.PI * 2);
+          targetCtx.fill();
+        }
+      }
+
+      treeCtx.restore();
+      frontCtx.restore();
+    }
+
+    /**
+     * ============================================================================
+     * 6. 左下角 UI 动效：
+     *    - 进度条稍微调快一点点，仍保留卡顿停顿质感
+     *    - 百分比在进度条跑完(100%)之后再定格显示最终结果数据
+     * ============================================================================
+     */
+    function initHudAnimations() {
+      const progressBar = document.getElementById('scan-progress');
+      const analyzingEl = document.getElementById('analyzing-text');
+      const metricItems = Array.from(document.querySelectorAll('.metric-item'));
+
+      // 预处理各项指标元数据
+      const metricsState = metricItems.map((item) => ({
+        targetVal: parseInt(item.getAttribute('data-target'), 10),
+        valSpan: item.querySelector('.metric-value'),
+        settled: false
+      }));
+
+      let currentProgress = 0;
+
+      // 在进度条运行过程中，同步计算未到达最终定格的中间百分比（上限限制在 targetVal - 2 以内，确保真正的结果在进度条跑完后才揭晓）
+      function updateInProgressMetrics(progressRatio) {
+        metricsState.forEach((m) => {
+          // 随进度条推进缓慢上升，并在未完成前保留微幅运算跳动感，但绝不提前显示最终值
+          const maxInterim = Math.max(0, m.targetVal - 2);
+          const baseInterim = Math.floor(progressRatio * maxInterim);
+          const jitter = progressRatio > 0.08 ? Math.floor(Math.random() * 2) : 0;
+          const displayNum = Math.min(maxInterim, baseInterim + jitter);
+          m.valSpan.textContent = displayNum + '%';
+        });
+      }
+
+      // 进度条跑完后，按从上到下的顺序逐一揭示并定格最终结果百分比
+      function revealFinalMetrics() {
+        metricsState.forEach((m, idx) => {
+          setTimeout(() => {
+            const startText = parseInt(m.valSpan.textContent, 10) || 0;
+            const endVal = m.targetVal;
+            const settleDuration = 420;
+            const startTime = performance.now();
+
+            function settleStep(now) {
+              const t = Math.min(1, (now - startTime) / settleDuration);
+              const eased = 1 - Math.pow(1 - t, 3);
+              const val = Math.round(startText + (endVal - startText) * eased);
+              m.valSpan.textContent = val + '%';
+              if (t < 1) {
+                requestAnimationFrame(settleStep);
+              } else {
+                m.valSpan.textContent = endVal + '%';
+              }
+            }
+            requestAnimationFrame(settleStep);
+          }, idx * 180);
+        });
+      }
+
+      // 青色发光卡顿进度条（比上一版稍微调快一点点）
+      function stepProgress() {
+        if (currentProgress >= 100) {
+          progressBar.style.width = '100%';
+          analyzingEl.textContent = 'Analysis Complete';
+          // 进度条完全跑完后，才定格显示最终百分比结果内容
+          revealFinalMetrics();
+          return;
+        }
+
+        const isStall = Math.random() < 0.36; // 保留卡顿停顿感，但整体比上一版略快一点
+        const increment = isStall ? 0 : (Math.random() * 3.1 + 0.65);
+        currentProgress = Math.min(100, currentProgress + increment);
+        progressBar.style.width = currentProgress.toFixed(1) + '%';
+
+        // 进度条未到 100% 时仅显示运算中的中间百分比
+        if (currentProgress < 100) {
+          updateInProgressMetrics(currentProgress / 100);
+        }
+
+        const dots = '.'.repeat((Math.floor(currentProgress / 7) % 3) + 1);
+        analyzingEl.textContent = `Analyzing${dots}`;
+
+        const nextDelay = isStall ? (250 + Math.random() * 310) : (135 + Math.random() * 145);
+        setTimeout(stepProgress, nextDelay);
+      }
+
+      setTimeout(stepProgress, 150);
+    }
+
+    /**
+     * ============================================================================
+     * 7. 交互事件监听（严禁滚轮缩放，仅鼠标局部扰动与 3D 空间透视倾斜）
+     * ============================================================================
+     */
+    window.addEventListener('mousemove', (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+      mouse.active = true;
+
+      mouse.normX = (e.clientX / width) * 2 - 1;
+      mouse.normY = (e.clientY / height) * 2 - 1;
+
+      if (CONFIG.ENABLE_3D_PARALLAX) {
+        const rotY = mouse.normX * CONFIG.PARALLAX_DEPTH_ANGLE;
+        const rotX = -mouse.normY * CONFIG.PARALLAX_DEPTH_ANGLE;
+        stage.style.transform = `rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) scale(1.04)`;
+      }
+    });
+
+    window.addEventListener('mouseleave', () => {
+      mouse.active = false;
+      mouse.x = -9999;
+      mouse.y = -9999;
+      mouse.normX = 0;
+      mouse.normY = 0;
+      stage.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1.04)';
+    });
+
+    window.addEventListener('resize', resizeCanvases);
+
+    /**
+     * ============================================================================
+     * 8. 主动画驱动循环
+     * ============================================================================
+     */
+    function animate(now) {
+      const timeSec = now * 0.001;
+      renderTreeAndPulses(timeSec);
+      requestAnimationFrame(animate);
+    }
+
+    // 启动初始化
+    resizeCanvases();
+    loadImageWithFallback(CONFIG.IMAGE_URLS);
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

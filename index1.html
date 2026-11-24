@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Select Your Desire - 3D Interactive Scene</title>
+  <!-- 引入具有古典锐利雕刻感与华丽衬线气质的字体 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #04080c;
+      font-family: 'Cinzel', serif;
+      user-select: none;
+    }
+
+    /* 页面跳转时的平滑暗场过渡遮罩 */
+    #page-transition-veil {
+      position: fixed;
+      inset: 0;
+      background-color: #020508;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 2000;
+      transition: opacity 0.65s ease-in-out;
+    }
+
+    #page-transition-veil.is-leaving {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* 1. 页面底层固定定位的伪元素：边缘四周青色径向渐变呼吸灯发光动画 */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 999;
+      background: radial-gradient(
+        circle at center,
+        transparent 52%,
+        rgba(0, 240, 255, 0.08) 78%,
+        rgba(0, 225, 255, 0.35) 100%
+      );
+      box-shadow: inset 0 0 70px rgba(0, 240, 255, 0.35);
+      animation: cyanBreathing 4.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes cyanBreathing {
+      0% {
+        opacity: 0.45;
+        box-shadow: inset 0 0 40px rgba(0, 240, 255, 0.2);
+      }
+      100% {
+        opacity: 1;
+        box-shadow: inset 0 0 110px rgba(0, 240, 255, 0.55);
+      }
+    }
+
+    /* 2. 画面整体正居中文字：置于所有3D图层之上，确保图片绝对无法遮挡文字 */
+    .header-overlay {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 300;
+      text-align: center;
+      width: 92%;
+      max-width: 860px;
+      pointer-events: none;
+    }
+
+    .title-link {
+      display: inline-block;
+      text-decoration: none;
+      cursor: pointer;
+      pointer-events: auto;
+      position: relative;
+      padding: 10px 22px;
+      transition: transform 0.45s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.45s ease;
+      opacity: 0.96;
+    }
+
+    .main-title-wrap {
+      position: relative;
+      display: inline-block;
+    }
+
+    .main-title,
+    .main-title-extrude {
+      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-weight: 900;
+      font-size: clamp(1.35rem, 2.5vw, 2.25rem);
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      line-height: 1.25;
+      white-space: nowrap;
+    }
+
+    .main-title-extrude {
+      position: absolute;
+      inset: 0;
+      color: #0b1016;
+      z-index: 1;
+      text-shadow:
+        0 1px 0 #1f2833,
+        0 2px 0 #141a21,
+        0 3px 0 #0a0e12,
+        0 4px 2px rgba(0, 0, 0, 0.95),
+        0 8px 16px rgba(0, 0, 0, 0.95),
+        0 0 22px rgba(0, 0, 0, 0.85);
+      transition: text-shadow 0.45s ease;
+    }
+
+    .main-title {
+      position: relative;
+      z-index: 2;
+      background: linear-gradient(
+        180deg,
+        #ffffff 0%,
+        #e2eaf2 18%,
+        #7c8996 46%,
+        #2b333c 51%,
+        #a8b5c2 76%,
+        #eef5fc 92%,
+        #525e6b 100%
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0px -0.6px 0px rgba(255, 255, 255, 0.7))
+              drop-shadow(0px 1.2px 0px rgba(10, 15, 20, 0.95));
+      transition: all 0.45s ease;
+    }
+
+    .sub-title {
+      margin-top: 10px;
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 600;
+      font-size: clamp(1.05rem, 1.65vw, 1.5rem);
+      letter-spacing: 0.28em;
+      color: #b8c5d1;
+      text-shadow:
+        0 -0.5px 0 rgba(255, 255, 255, 0.45),
+        0 1px 0 #121820,
+        0 2px 3px rgba(0, 0, 0, 0.98),
+        0 4px 12px rgba(0, 0, 0, 0.95);
+      transition: all 0.45s ease;
+    }
+
+    .title-link:hover {
+      transform: translateY(-1px) scale(1.02);
+    }
+
+    .title-link:hover .main-title {
+      background: linear-gradient(180deg, #f0ffff 0%, #33f9ff 48%, #00b8cc 54%, #a6fcff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 8px rgba(0, 247, 255, 0.9))
+              drop-shadow(0 0 20px rgba(0, 247, 255, 0.65));
+      animation: textCyanPulse 1.7s ease-in-out infinite alternate;
+    }
+
+    .title-link:hover .main-title-extrude {
+      text-shadow:
+        0 1px 0 #004d59,
+        0 2px 0 #00313a,
+        0 0 14px rgba(0, 247, 255, 0.85),
+        0 0 32px rgba(0, 220, 255, 0.55);
+    }
+
+    .title-link:hover .sub-title {
+      color: #7df9ff;
+      text-shadow:
+        0 0 8px rgba(0, 247, 255, 0.95),
+        0 0 20px rgba(0, 247, 255, 0.7),
+        0 0 36px rgba(0, 200, 255, 0.45);
+      animation: textCyanPulse 1.7s ease-in-out infinite alternate;
+    }
+
+    @keyframes textCyanPulse {
+      0% {
+        opacity: 0.78;
+      }
+      100% {
+        opacity: 1;
+      }
+    }
+
+    /* 主舞台 3D 透视容器 */
+    #scene-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      perspective: 1400px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* 3D 空间世界层 */
+    #world-3d {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 0.15s ease-out;
+    }
+
+    /* 背景底图 */
+    .bg-base {
+      position: absolute;
+      inset: -4%;
+      width: 108%;
+      height: 108%;
+      background-image: url('https://raw.githubusercontent.com/lanksee628/my-image/671e682332e360d4e8eee1b447c5a776807c444d/1bg.jpg');
+      background-size: cover;
+      background-position: center;
+      filter: brightness(0.75) contrast(1.15);
+      z-index: 1;
+      transform: translateZ(-120px) scale(1.08);
+    }
+
+    /* 背景主体“树”的 3D 立体强化层 */
+    .tree-3d-core {
+      position: absolute;
+      inset: -4%;
+      width: 108%;
+      height: 108%;
+      background-image: url('https://raw.githubusercontent.com/lanksee628/my-image/671e682332e360d4e8eee1b447c5a776807c444d/1bg.jpg');
+      background-size: cover;
+      background-position: center;
+      -webkit-mask-image: radial-gradient(ellipse 32% 68% at 50% 54%, #000 55%, rgba(0,0,0,0.4) 75%, transparent 95%);
+      mask-image: radial-gradient(ellipse 32% 68% at 50% 54%, #000 55%, rgba(0,0,0,0.4) 75%, transparent 95%);
+      filter: contrast(1.25) brightness(1.05) drop-shadow(0 25px 35px rgba(0, 0, 0, 0.9));
+      z-index: 10;
+      transform: translateZ(0px);
+      pointer-events: none;
+      animation: treeFloat3D 7s ease-in-out infinite alternate;
+    }
+
+    @keyframes treeFloat3D {
+      0% {
+        transform: translateZ(0px) scale(1) rotateY(-1.5deg);
+      }
+      100% {
+        transform: translateZ(25px) scale(1.02) rotateY(1.5deg);
+      }
+    }
+
+    /* 流动粒子画布 */
+    #particle-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    /* 五张螺旋环绕图片容器 */
+    #spiral-gallery {
+      position: absolute;
+      inset: 0;
+      transform-style: preserve-3d;
+      pointer-events: none;
+    }
+
+    .spiral-item {
+      position: absolute;
+      top: 52%;
+      left: 50%;
+      width: clamp(220px, 23vw, 360px);
+      aspect-ratio: 3 / 4;
+      margin-left: calc(clamp(220px, 23vw, 360px) / -2);
+      margin-top: calc(clamp(220px, 23vw, 360px) * 4 / 3 / -2);
+      pointer-events: auto;
+      cursor: pointer;
+      transform-style: preserve-3d;
+      will-change: transform, opacity, filter;
+    }
+
+    .spiral-item-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: transparent;
+    }
+
+    .spiral-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      pointer-events: none;
+      filter: drop-shadow(0 14px 24px rgba(0, 0, 0, 0.85));
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), filter 0.35s ease;
+    }
+
+    .spiral-item.is-hovered img {
+      transform: scale(1.04);
+      filter:
+        drop-shadow(0 0 6px rgba(0, 247, 255, 0.95))
+        drop-shadow(0 0 16px rgba(0, 235, 255, 0.75))
+        drop-shadow(0 16px 28px rgba(0, 0, 0, 0.9));
+    }
+
+    .card-label {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 14px;
+      background: rgba(3, 10, 16, 0.82);
+      border: 1px solid rgba(0, 240, 255, 0.45);
+      border-radius: 20px;
+      color: #d8f8ff;
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .spiral-item.is-hovered .card-label {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 页面切换淡出黑幕 -->
+  <div id="page-transition-veil"></div>
+
+  <!-- 居中正中 3D 华丽锐利金属浮雕文字 -->
+  <header class="header-overlay">
+    <a href="#desire" class="title-link" onclick="event.preventDefault()">
+      <div class="main-title-wrap">
+        <span class="main-title-extrude" aria-hidden="true">SELECT YOUR DESIRE</span>
+        <h1 class="main-title">SELECT YOUR DESIRE</h1>
+      </div>
+      <p class="sub-title">Choose one aspect that defines you</p>
+    </a>
+  </header>
+
+  <div id="scene-container">
+    <div id="world-3d">
+      <div class="bg-base"></div>
+      <div class="tree-3d-core"></div>
+      <canvas id="particle-canvas"></canvas>
+      <div id="spiral-gallery"></div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * 1. 五张图片资源配置
+     * - 第一张 11car.png 已配置 targetUrl: 'index2.html' 实现点击跳转
+     */
+    const cardsData = [
+      {
+        id: 'career',
+        label: 'CAREER & AMBITION',
+        src: 'https://raw.githubusercontent.com/lanksee628/my-image/df4ab174a737f308ce91b175c6996b0d91e3b0c5/11car.png',
+        baseScale: 1.12,
+        targetUrl: 'index2.html'
+      },
+      {
+        id: 'family',
+        label: 'FAMILY & ROOTS',
+        src: 'https://raw.githubusercontent.com/lanksee628/my-image/54377e1ddd778bcbaf436464fb848f9dbed2fecc/11fam.png',
+        baseScale: 0.96,
+        targetUrl: null
+      },
+      {
+        id: 'health',
+        label: 'HEALTH & VITALITY',
+        src: 'https://raw.githubusercontent.com/lanksee628/my-image/54377e1ddd778bcbaf436464fb848f9dbed2fecc/11hea.png',
+        baseScale: 1.18,
+        targetUrl: null
+      },
+      {
+        id: 'love',
+        label: 'LOVE & PASSION',
+        src: 'https://raw.githubusercontent.com/lanksee628/my-image/54377e1ddd778bcbaf436464fb848f9dbed2fecc/11love.png',
+        baseScale: 1.04,
+        targetUrl: null
+      },
+      {
+        id: 'study',
+        label: 'WISDOM & STUDY',
+        src: 'https://raw.githubusercontent.com/lanksee628/my-image/54377e1ddd778bcbaf436464fb848f9dbed2fecc/11stu.png',
+        baseScale: 1.08,
+        targetUrl: null
+      }
+    ];
+
+    const galleryEl = document.getElementById('spiral-gallery');
+    const world3dEl = document.getElementById('world-3d');
+    const veilEl = document.getElementById('page-transition-veil');
+
+    let isAnyCardHovered = false;
+    let hoveredIndex = -1;
+    let isNavigating = false;
+    let mouseX = 0;
+    let mouseY = 0;
+    let smoothMouseX = 0;
+    let smoothMouseY = 0;
+
+    let spiralTime = 0;
+    let speedMultiplier = 1;
+
+    function navigateToPage(url) {
+      if (!url || isNavigating) return;
+      isNavigating = true;
+      veilEl.classList.add('is-leaving');
+      setTimeout(() => {
+        window.location.href = url;
+      }, 650);
+    }
+
+    const cardElements = cardsData.map((item, index) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'spiral-item';
+      wrapper.dataset.index = index;
+
+      const inner = document.createElement('div');
+      inner.className = 'spiral-item-inner';
+
+      const img = document.createElement('img');
+      img.src = item.src;
+      img.alt = item.label;
+
+      const label = document.createElement('div');
+      label.className = 'card-label';
+      label.textContent = item.targetUrl ? `${item.label} · ENTER` : item.label;
+
+      inner.appendChild(img);
+      inner.appendChild(label);
+      wrapper.appendChild(inner);
+      galleryEl.appendChild(wrapper);
+
+      wrapper.addEventListener('mouseenter', () => {
+        isAnyCardHovered = true;
+        hoveredIndex = index;
+        wrapper.classList.add('is-hovered');
+      });
+
+      wrapper.addEventListener('mouseleave', () => {
+        if (!isNavigating) {
+          isAnyCardHovered = false;
+          hoveredIndex = -1;
+          wrapper.classList.remove('is-hovered');
+        }
+      });
+
+      wrapper.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+
+        if (item.targetUrl) {
+          navigateToPage(item.targetUrl);
+        } else {
+          alert(`You selected: ${item.label}`);
+        }
+      });
+
+      return {
+        wrapper,
+        inner,
+        data: item,
+        initialProgress: index / cardsData.length
+      };
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+      mouseY = (e.clientY / window.innerHeight) * 2 - 1;
+    });
+
+    function animateSpiral() {
+      smoothMouseX += (mouseX - smoothMouseX) * 0.06;
+      smoothMouseY += (mouseY - smoothMouseY) * 0.06;
+
+      world3dEl.style.transform = `rotateY(${smoothMouseX * 4.5}deg) rotateX(${-smoothMouseY * 3.5}deg)`;
+
+      const targetSpeed = (isAnyCardHovered || isNavigating) ? 0 : 1;
+      speedMultiplier += (targetSpeed - speedMultiplier) * 0.08;
+
+      spiralTime += 0.0014 * speedMultiplier;
+
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      const radiusX = Math.min(vw * 0.34, 520);
+      const radiusZ = 340;
+      const totalVerticalSpan = vh * 1.32;
+
+      cardElements.forEach((card, idx) => {
+        let p = (card.initialProgress + spiralTime) % 1;
+        if (p < 0) p += 1;
+
+        const y = (0.5 - p) * totalVerticalSpan + vh * 0.1;
+        const theta = p * Math.PI * 4.4 + smoothMouseX * 1.15;
+
+        const x = Math.sin(theta) * radiusX;
+        const z = Math.cos(theta) * radiusZ;
+
+        const arcSkewY = Math.cos(theta) * -8;
+        const spiralTiltZ = Math.sin(theta) * 6;
+
+        const mouseFollowRotY = smoothMouseX * 22;
+        const mouseFollowRotX = -smoothMouseY * 18;
+
+        const depthFactor = (z + radiusZ) / (2 * radiusZ);
+        const isHovered = (hoveredIndex === idx);
+        const hoverBoost = isHovered ? 1.12 : 1.0;
+        const finalScale = card.data.baseScale * (0.72 + depthFactor * 0.5) * hoverBoost;
+
+        let edgeAlpha = 1;
+        if (p < 0.12) {
+          edgeAlpha = p / 0.12;
+        } else if (p > 0.86) {
+          edgeAlpha = (1 - p) / 0.14;
+        }
+
+        const isInFrontOfTree = z >= -20;
+        const depthBrightness = isInFrontOfTree ? 1.05 : 0.62;
+        const finalOpacity = edgeAlpha * (isInFrontOfTree ? 0.98 : 0.78);
+
+        const zIndex = isHovered ? 45 : Math.round(10 + (z / radiusZ) * 8);
+
+        card.wrapper.style.zIndex = zIndex;
+        card.wrapper.style.opacity = finalOpacity.toFixed(3);
+        card.wrapper.style.filter = isHovered
+          ? 'brightness(1.12) contrast(1.06)'
+          : `brightness(${depthBrightness})`;
+
+        card.wrapper.style.transform = `
+          translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z.toFixed(1)}px)
+          scale(${finalScale.toFixed(3)})
+          rotateY(${(Math.sin(theta) * 32 + mouseFollowRotY).toFixed(1)}deg)
+          rotateX(${mouseFollowRotX.toFixed(1)}deg)
+          rotateZ(${spiralTiltZ.toFixed(1)}deg)
+          skewY(${arcSkewY.toFixed(1)}deg)
+        `;
+      });
+
+      requestAnimationFrame(animateSpiral);
+    }
+
+    requestAnimationFrame(animateSpiral);
+
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+    let particles = [];
+
+    function resizeCanvas() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class Particle {
+      constructor() {
+        this.reset(true);
+      }
+
+      reset(initial = false) {
+        this.x = Math.random() * width;
+        this.y = initial ? Math.random() * height : height + 20;
+        this.size = Math.random() * 2.6 + 0.6;
+        this.speedY = -(Math.random() * 0.9 + 0.35);
+        this.swayAmplitude = Math.random() * 1.4 + 0.4;
+        this.swaySpeed = Math.random() * 0.02 + 0.008;
+        this.phase = Math.random() * Math.PI * 2;
+        this.alpha = Math.random() * 0.65 + 0.2;
+        this.color = Math.random() > 0.3 ? '0, 245, 255' : '160, 250, 255';
+      }
+
+      update() {
+        this.phase += this.swaySpeed;
+        this.y += this.speedY;
+        this.x += Math.sin(this.phase) * this.swayAmplitude + smoothMouseX * 0.6;
+
+        if (this.y < -20 || this.x < -30 || this.x > width + 30) {
+          this.reset(false);
+        }
+      }
+
+      draw() {
+        ctx.beginPath();
+        const gradient = ctx.createRadialGradient(
+          this.x, this.y, 0,
+          this.x, this.y, this.size * 2.8
+        );
+        gradient.addColorStop(0, `rgba(${this.color}, ${this.alpha})`);
+        gradient.addColorStop(1, `rgba(${this.color}, 0)`);
+
+        ctx.fillStyle = gradient;
+        ctx.arc(this.x, this.y, this.size * 2.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function initParticles() {
+      particles = [];
+      const count = Math.min(Math.floor((width * height) / 11000), 130);
+      for (let i = 0; i < count; i++) {
+        particles.push(new Particle());
+      }
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, width, height);
+      for (let p of particles) {
+        p.update();
+        p.draw();
+      }
+      requestAnimationFrame(animateParticles);
+    }
+
+    initParticles();
+    animateParticles();
+  </script>
+</body>
+</html>

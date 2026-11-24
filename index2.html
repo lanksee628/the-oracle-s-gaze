@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>360° Panoramic Ultra-Density Pure Particle Sphere</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #020508;
+      font-family: 'Cinzel', serif;
+      user-select: none;
+    }
+
+    /* 页面进入时的平滑渐显效果 */
+    body {
+      animation: pageFadeIn 0.8s ease-out forwards;
+    }
+
+    @keyframes pageFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* 四周极微弱青色氛围暗角，强化360°沉浸感 */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 900;
+      background: radial-gradient(
+        circle at center,
+        transparent 62%,
+        rgba(0, 235, 255, 0.05) 86%,
+        rgba(0, 210, 245, 0.18) 100%
+      );
+      box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.8);
+    }
+
+    /* 全屏 360° 交互画布容器 */
+    #pano-360-container {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #020508;
+      cursor: grab;
+      overflow: hidden;
+    }
+
+    #pano-360-container.is-dragging {
+      cursor: grabbing;
+    }
+
+    #pano-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 画面居中底部文字与加宽微卡顿扫描进度条 */
+    .hud-overlay {
+      position: fixed;
+      bottom: 6.5%;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 500;
+      text-align: center;
+      width: 94%;
+      max-width: 960px;
+      pointer-events: none;
+    }
+
+    .title-link {
+      display: inline-block;
+      text-decoration: none;
+      cursor: pointer;
+      pointer-events: auto;
+      padding: 8px 20px;
+      transition: transform 0.45s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.45s ease;
+      opacity: 0.96;
+    }
+
+    .main-title-wrap {
+      position: relative;
+      display: inline-block;
+    }
+
+    .main-title,
+    .main-title-extrude {
+      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-weight: 900;
+      font-size: clamp(1.3rem, 2.35vw, 2.2rem);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      line-height: 1.25;
+      white-space: nowrap;
+    }
+
+    .main-title-extrude {
+      position: absolute;
+      inset: 0;
+      color: #090e14;
+      z-index: 1;
+      text-shadow:
+        0 1px 0 #1e2833,
+        0 2px 0 #121820,
+        0 3px 0 #080c10,
+        0 5px 6px rgba(0, 0, 0, 0.96),
+        0 0 14px rgba(190, 248, 255, 0.36),
+        0 0 28px rgba(130, 238, 255, 0.22);
+      transition: text-shadow 0.45s ease;
+    }
+
+    .main-title {
+      position: relative;
+      z-index: 2;
+      background: linear-gradient(
+        180deg,
+        #ffffff 0%,
+        #e2f4fa 20%,
+        #7f92a3 47%,
+        #28323d 52%,
+        #adc1d1 77%,
+        #eff9fc 92%,
+        #536373 100%
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0px -0.6px 0px rgba(235, 252, 255, 0.85))
+              drop-shadow(0px 0px 8px rgba(185, 248, 255, 0.35));
+      transition: all 0.45s ease;
+    }
+
+    .sub-title {
+      margin-top: 9px;
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 600;
+      font-size: clamp(1.05rem, 1.55vw, 1.42rem);
+      letter-spacing: 0.28em;
+      color: #cde8f0;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.98),
+        0 0 10px rgba(190, 250, 255, 0.42),
+        0 0 22px rgba(130, 238, 255, 0.24);
+      transition: all 0.45s ease;
+    }
+
+    .title-link:hover {
+      transform: translateY(-1px) scale(1.02);
+    }
+
+    .title-link:hover .main-title {
+      background: linear-gradient(180deg, #f2ffff 0%, #2ef8ff 48%, #00b4c8 54%, #a8fcff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 10px rgba(0, 247, 255, 0.95))
+              drop-shadow(0 0 24px rgba(0, 247, 255, 0.65));
+      animation: cyanTextFadePulse 1.6s ease-in-out infinite alternate;
+    }
+
+    .title-link:hover .main-title-extrude {
+      text-shadow:
+        0 1px 0 #004c58,
+        0 2px 0 #002f38,
+        0 0 16px rgba(0, 247, 255, 0.88),
+        0 0 36px rgba(0, 220, 255, 0.58);
+    }
+
+    .title-link:hover .sub-title {
+      color: #7df9ff;
+      text-shadow:
+        0 0 10px rgba(0, 247, 255, 0.95),
+        0 0 22px rgba(0, 247, 255, 0.72),
+        0 0 40px rgba(0, 200, 255, 0.5);
+      animation: cyanTextFadePulse 1.6s ease-in-out infinite alternate;
+    }
+
+    @keyframes cyanTextFadePulse {
+      0% { opacity: 0.72; }
+      100% { opacity: 1; }
+    }
+
+    .scan-progress-container {
+      margin: 16px auto 0;
+      width: clamp(340px, 52vw, 680px);
+      height: 4px;
+      background: rgba(6, 18, 26, 0.82);
+      border-radius: 999px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      box-shadow:
+        0 0 14px rgba(0, 240, 255, 0.25),
+        inset 0 0 6px rgba(0, 0, 0, 0.9);
+    }
+
+    .scan-progress-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 210, 235, 0.35) 0%,
+        rgba(0, 245, 255, 0.85) 65%,
+        #b8ffff 92%,
+        #ffffff 100%
+      );
+      box-shadow:
+        0 0 10px #00f7ff,
+        0 0 22px rgba(0, 247, 255, 0.85),
+        0 0 36px rgba(0, 220, 255, 0.55);
+      animation: scanStutterFill 7.5s linear infinite;
+    }
+
+    @keyframes scanStutterFill {
+      0%   { width: 0%;   opacity: 0.85; }
+      14%  { width: 21%;  opacity: 1; }
+      21%  { width: 22.5%; opacity: 0.9; }
+      38%  { width: 49%;  opacity: 1; }
+      46%  { width: 50.5%; opacity: 0.88; }
+      65%  { width: 76%;  opacity: 1; }
+      74%  { width: 77.5%; opacity: 0.92; }
+      92%  { width: 98%;  opacity: 1; }
+      97%  { width: 100%; opacity: 1; }
+      100% { width: 100%; opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="hud-overlay">
+    <a href="index3.html" class="title-link" title="Proceed to Neural Topology Scan">
+      <div class="main-title-wrap">
+        <span class="main-title-extrude" aria-hidden="true">YOUR DESIRE HAS BEEN RECEIVED</span>
+        <h1 class="main-title">YOUR DESIRE HAS BEEN RECEIVED</h1>
+      </div>
+      <p class="sub-title">Initiating Scan...</p>
+    </a>
+
+    <div class="scan-progress-container" aria-label="Scanning Progress">
+      <div class="scan-progress-bar"></div>
+    </div>
+  </header>
+
+  <div id="pano-360-container">
+    <canvas id="pano-canvas"></canvas>
+  </div>
+
+  <script>
+    const CONFIG = {
+      IMAGE_URL: 'https://raw.githubusercontent.com/lanksee628/my-image/df4ab174a737f308ce91b175c6996b0d91e3b0c5/page2.png',
+
+      MIN_ZOOM: 0.65,
+      MAX_ZOOM: 3.4,
+      ZOOM_SENSITIVITY: 0.0012,
+      ZOOM_SMOOTHING: 0.1,
+
+      MAX_PARTICLES: 50000,
+
+      SAMPLE_STEP: 1,
+      MIN_POISSON_DIST: 0.92,
+      ALPHA_THRESHOLD: 8,
+      LUMA_THRESHOLD: 8,
+
+      MIN_RADIUS: 0.62,
+      MAX_RADIUS: 1.58,
+
+      SPHERE_RADIUS: 880,
+      HORIZONTAL_ARC: Math.PI * 2,
+      VERTICAL_ARC: Math.PI * 0.78,
+
+      MICRO_DRIFT_BASE: 0.5,
+      MICRO_DRIFT_SPEED: 0.018,
+
+      MOUSE_RADIUS: 120,
+      MOUSE_REPEL_FORCE: 6.5,
+      DAMPING: 0.86,
+      RETURN_SPRING: 0.032,
+
+      DRAG_ROTATE_SPEED: 0.0032,
+      CAMERA_SMOOTHING: 0.12
+    };
+
+    const container = document.getElementById('pano-360-container');
+    const canvas = document.getElementById('pano-canvas');
+    const ctx = canvas.getContext('2d');
+
+    let viewW = 0;
+    let viewH = 0;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    let portraitParticles = [];
+    let ambientParticles = [];
+
+    const camera = {
+      yaw: 0,
+      targetYaw: 0,
+      pitch: 0,
+      targetPitch: 0,
+      zoom: 1,
+      targetZoom: 1,
+      panOffsetX: 0,
+      targetPanOffsetX: 0,
+      panOffsetY: 0,
+      targetPanOffsetY: 0,
+      autoDriftSpeed: 0.00032
+    };
+
+    const pointer = {
+      x: -9999,
+      y: -9999,
+      active: false,
+      isDragging: false,
+      lastX: 0,
+      lastY: 0
+    };
+
+    class Pano3DParticle {
+      constructor(u, v, r, g, b, alpha, luma) {
+        this.anchorTheta = (u - 0.5) * CONFIG.HORIZONTAL_ARC;
+        this.anchorPhi = (v - 0.5) * CONFIG.VERTICAL_ARC;
+
+        this.ox = 0;
+        this.oy = 0;
+        this.vx = 0;
+        this.vy = 0;
+
+        this.radius3D = CONFIG.SPHERE_RADIUS;
+
+        this.luma = luma;
+        const finalAlpha = Math.min(1.0, Math.max(0.32, alpha * (0.5 + luma * 0.65)));
+        this.colorStyle = `rgba(${r}, ${g}, ${b}, ${finalAlpha.toFixed(3)})`;
+        this.baseSize = CONFIG.MIN_RADIUS + Math.pow(luma, 0.8) * (CONFIG.MAX_RADIUS - CONFIG.MIN_RADIUS);
+
+        this.phaseX = Math.random() * Math.PI * 2;
+        this.phaseY = Math.random() * Math.PI * 2;
+        this.freqX = CONFIG.MICRO_DRIFT_SPEED * (0.7 + Math.random() * 0.6);
+        this.freqY = CONFIG.MICRO_DRIFT_SPEED * (0.7 + Math.random() * 0.6);
+        this.driftAmp = CONFIG.MICRO_DRIFT_BASE * (1.15 - luma * 0.45);
+      }
+
+      updateAndDraw(ctx, focalLength, halfW, halfH, sinYaw, cosYaw, sinPitch, cosPitch) {
+        this.phaseX += this.freqX;
+        this.phaseY += this.freqY;
+        const microX = Math.sin(this.phaseX) * this.driftAmp;
+        const microY = Math.cos(this.phaseY) * this.driftAmp;
+
+        const cosPhi = Math.cos(this.anchorPhi);
+        const sinPhi = Math.sin(this.anchorPhi);
+        const sinTheta = Math.sin(this.anchorTheta);
+        const cosTheta = Math.cos(this.anchorTheta);
+
+        const wx = this.radius3D * cosPhi * sinTheta;
+        const wy = this.radius3D * sinPhi;
+        const wz = this.radius3D * cosPhi * cosTheta;
+
+        const rx = wx * cosYaw - wz * sinYaw;
+        const rz1 = wx * sinYaw + wz * cosYaw;
+
+        const ry = wy * cosPitch - rz1 * sinPitch;
+        const rz = wy * sinPitch + rz1 * cosPitch;
+
+        if (rz <= 60) {
+          this.ox += (microX - this.ox) * CONFIG.RETURN_SPRING;
+          this.oy += (microY - this.oy) * CONFIG.RETURN_SPRING;
+          this.vx *= CONFIG.DAMPING;
+          this.vy *= CONFIG.DAMPING;
+          this.ox += this.vx;
+          this.oy += this.vy;
+          return;
+        }
+
+        const perspScale = (focalLength / rz) * camera.zoom;
+        const anchorScreenX = halfW + rx * perspScale + camera.panOffsetX;
+        const anchorScreenY = halfH + ry * perspScale + camera.panOffsetY;
+
+        const curScreenX = anchorScreenX + this.ox * camera.zoom;
+        const curScreenY = anchorScreenY + this.oy * camera.zoom;
+
+        if (pointer.active) {
+          const dx = curScreenX - pointer.x;
+          const dy = curScreenY - pointer.y;
+          const distSq = dx * dx + dy * dy;
+          const maxR = CONFIG.MOUSE_RADIUS;
+
+          if (distSq < maxR * maxR && distSq > 0.001) {
+            const dist = Math.sqrt(distSq);
+            const falloff = Math.pow(1 - dist / maxR, 2);
+            const force = (falloff * CONFIG.MOUSE_REPEL_FORCE) / camera.zoom;
+            this.vx += (dx / dist) * force;
+            this.vy += (dy / dist) * force;
+          }
+        }
+
+        this.vx += (microX - this.ox) * CONFIG.RETURN_SPRING;
+        this.vy += (microY - this.oy) * CONFIG.RETURN_SPRING;
+        this.vx *= CONFIG.DAMPING;
+        this.vy *= CONFIG.DAMPING;
+        this.ox += this.vx;
+        this.oy += this.vy;
+
+        const finalX = anchorScreenX + this.ox * camera.zoom;
+        const finalY = anchorScreenY + this.oy * camera.zoom;
+        if (finalX < -20 || finalX > viewW + 20 || finalY < -20 || finalY > viewH + 20) {
+          return;
+        }
+
+        const drawRadius = Math.max(0.45, this.baseSize * perspScale);
+        ctx.fillStyle = this.colorStyle;
+        ctx.beginPath();
+        ctx.arc(finalX, finalY, drawRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    class AmbientSpaceParticle {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        this.theta = Math.random() * Math.PI * 2;
+        this.phi = (Math.random() - 0.5) * Math.PI * 0.9;
+        this.dist = CONFIG.SPHERE_RADIUS * (0.45 + Math.random() * 0.75);
+        this.speedPhi = -(Math.random() * 0.0012 + 0.0004);
+        this.swayPhase = Math.random() * Math.PI * 2;
+        this.size = Math.random() * 2.1 + 0.55;
+        this.alpha = Math.random() * 0.5 + 0.14;
+        this.color = Math.random() > 0.25 ? '0, 245, 255' : '175, 250, 255';
+      }
+
+      updateAndDraw(ctx, focalLength, halfW, halfH, sinYaw, cosYaw, sinPitch, cosPitch) {
+        this.swayPhase += 0.015;
+        this.phi += this.speedPhi;
+        this.theta += Math.sin(this.swayPhase) * 0.0006;
+
+        if (this.phi < -Math.PI * 0.48) {
+          this.phi = Math.PI * 0.48;
+        }
+
+        const cosPhi = Math.cos(this.phi);
+        const wx = this.dist * cosPhi * Math.sin(this.theta);
+        const wy = this.dist * Math.sin(this.phi);
+        const wz = this.dist * cosPhi * Math.cos(this.theta);
+
+        const rx = wx * cosYaw - wz * sinYaw;
+        const rz1 = wx * sinYaw + wz * cosYaw;
+        const ry = wy * cosPitch - rz1 * sinPitch;
+        const rz = wy * sinPitch + rz1 * cosPitch;
+
+        if (rz <= 50) return;
+
+        const scale = (focalLength / rz) * camera.zoom;
+        const sx = halfW + rx * scale + camera.panOffsetX;
+        const sy = halfH + ry * scale + camera.panOffsetY;
+
+        if (sx < -30 || sx > viewW + 30 || sy < -30 || sy > viewH + 30) return;
+
+        const r = this.size * scale * 2.5;
+        const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+        grad.addColorStop(0, `rgba(${this.color}, ${this.alpha})`);
+        grad.addColorStop(1, `rgba(${this.color}, 0)`);
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function resizeViewport() {
+      viewW = window.innerWidth;
+      viewH = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      canvas.width = Math.round(viewW * dpr);
+      canvas.height = Math.round(viewH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function samplePureParticlesFromOffscreenImage(img) {
+      const targetH = Math.min(img.height, 960);
+      const scale = targetH / img.height;
+      const singleW = Math.round(img.width * scale);
+      const panoW = singleW * 2;
+      const panoH = targetH;
+
+      const exactAspectRatioArc = CONFIG.HORIZONTAL_ARC * (panoH / panoW);
+      CONFIG.VERTICAL_ARC = Math.min(Math.PI * 0.85, exactAspectRatioArc);
+
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = panoW;
+      offCanvas.height = panoH;
+      const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+
+      offCtx.drawImage(img, 0, 0, singleW, panoH);
+      offCtx.save();
+      offCtx.translate(panoW, 0);
+      offCtx.scale(-1, 1);
+      offCtx.drawImage(img, 0, 0, singleW, panoH);
+      offCtx.restore();
+
+      let imageData;
+      try {
+        imageData = offCtx.getImageData(0, 0, panoW, panoH).data;
+      } catch (err) {
+        console.error('跨域像素读取失败，请通过本地服务器 (如 VS Code Live Server) 运行:', err);
+        return;
+      }
+
+      const candidates = [];
+      const step = CONFIG.SAMPLE_STEP;
+
+      for (let y = 0; y < panoH; y += step) {
+        const v = y / panoH;
+        const vNorm = Math.abs(v * 2 - 1);
+        const vFade = vNorm > 0.92 ? Math.max(0, 1 - (vNorm - 0.92) / 0.08) : 1;
+        if (vFade <= 0.02) continue;
+
+        for (let x = 0; x < panoW; x += step) {
+          const idx = (y * panoW + x) * 4;
+          const r = imageData[idx];
+          const g = imageData[idx + 1];
+          const b = imageData[idx + 2];
+          const a = imageData[idx + 3];
+
+          if (a < CONFIG.ALPHA_THRESHOLD) continue;
+
+          const luma255 = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          if (luma255 < CONFIG.LUMA_THRESHOLD) continue;
+
+          const normAlpha = a / 255;
+          const normLuma = luma255 / 255;
+          const weight = Math.pow(normLuma, 1.15) * Math.pow(normAlpha, 1.05) * vFade;
+
+          if (weight > 0.006) {
+            const sx = x + (Math.random() - 0.5) * 0.4;
+            const sy = y + (Math.random() - 0.5) * 0.4;
+            candidates.push({
+              x: sx,
+              y: sy,
+              u: sx / panoW,
+              v: sy / panoH,
+              r, g, b,
+              alpha: normAlpha * vFade,
+              luma: normLuma,
+              sortKey: Math.pow(Math.random(), 1 / Math.max(weight, 0.0001))
+            });
+          }
+        }
+      }
+
+      candidates.sort((a, b) => b.sortKey - a.sortKey);
+
+      const cellSize = CONFIG.MIN_POISSON_DIST;
+      const gridCols = Math.ceil(panoW / cellSize);
+      const gridRows = Math.ceil(panoH / cellSize);
+      const grid = new Array(gridCols * gridRows);
+      const minDistSq = cellSize * cellSize;
+
+      portraitParticles = [];
+      for (let i = 0; i < candidates.length; i++) {
+        if (portraitParticles.length >= CONFIG.MAX_PARTICLES) break;
+
+        const c = candidates[i];
+        const gx = Math.floor(c.x / cellSize);
+        const gy = Math.floor(c.y / cellSize);
+        if (gx < 0 || gx >= gridCols || gy < 0 || gy >= gridRows) continue;
+
+        let tooClose = false;
+        const allowOverlapChance = c.luma > 0.78 ? 0.24 : 0.06;
+
+        if (Math.random() > allowOverlapChance) {
+          const startX = Math.max(0, gx - 1);
+          const endX = Math.min(gridCols - 1, gx + 1);
+          const startY = Math.max(0, gy - 1);
+          const endY = Math.min(gridRows - 1, gy + 1);
+
+          for (let ny = startY; ny <= endY && !tooClose; ny++) {
+            const rowOffset = ny * gridCols;
+            for (let nx = startX; nx <= endX; nx++) {
+              const neighbor = grid[rowOffset + nx];
+              if (neighbor) {
+                const dx = c.x - neighbor.x;
+                const dy = c.y - neighbor.y;
+                if (dx * dx + dy * dy < minDistSq) {
+                  tooClose = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (!tooClose) {
+          const cellIndex = gy * gridCols + gx;
+          if (!grid[cellIndex]) grid[cellIndex] = c;
+          portraitParticles.push(
+            new Pano3DParticle(c.u, c.v, c.r, c.g, c.b, c.alpha, c.luma)
+          );
+        }
+      }
+
+      ambientParticles = [];
+      for (let i = 0; i < 120; i++) {
+        ambientParticles.push(new AmbientSpaceParticle());
+      }
+    }
+
+    function animate() {
+      if (!pointer.isDragging) {
+        camera.targetYaw += camera.autoDriftSpeed;
+      }
+
+      camera.yaw += (camera.targetYaw - camera.yaw) * CONFIG.CAMERA_SMOOTHING;
+      camera.pitch += (camera.targetPitch - camera.pitch) * CONFIG.CAMERA_SMOOTHING;
+      camera.zoom += (camera.targetZoom - camera.zoom) * CONFIG.ZOOM_SMOOTHING;
+      camera.panOffsetX += (camera.targetPanOffsetX - camera.panOffsetX) * CONFIG.ZOOM_SMOOTHING;
+      camera.panOffsetY += (camera.targetPanOffsetY - camera.panOffsetY) * CONFIG.ZOOM_SMOOTHING;
+
+      ctx.fillStyle = '#020508';
+      ctx.fillRect(0, 0, viewW, viewH);
+
+      const focalLength = Math.max(viewW, viewH) * 0.72;
+      const halfW = viewW * 0.5;
+      const halfH = viewH * 0.5;
+
+      const sinYaw = Math.sin(camera.yaw);
+      const cosYaw = Math.cos(camera.yaw);
+      const sinPitch = Math.sin(camera.pitch);
+      const cosPitch = Math.cos(camera.pitch);
+
+      for (let i = 0; i < portraitParticles.length; i++) {
+        portraitParticles[i].updateAndDraw(
+          ctx, focalLength, halfW, halfH, sinYaw, cosYaw, sinPitch, cosPitch
+        );
+      }
+
+      for (let i = 0; i < ambientParticles.length; i++) {
+        ambientParticles[i].updateAndDraw(
+          ctx, focalLength, halfW, halfH, sinYaw, cosYaw, sinPitch, cosPitch
+        );
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    function bindEvents() {
+      container.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        pointer.isDragging = true;
+        pointer.lastX = e.clientX;
+        pointer.lastY = e.clientY;
+        container.classList.add('is-dragging');
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        pointer.x = e.clientX;
+        pointer.y = e.clientY;
+        pointer.active = true;
+
+        if (pointer.isDragging) {
+          const deltaX = e.clientX - pointer.lastX;
+          const deltaY = e.clientY - pointer.lastY;
+          pointer.lastX = e.clientX;
+          pointer.lastY = e.clientY;
+
+          const sensitivity = CONFIG.DRAG_ROTATE_SPEED / Math.sqrt(camera.zoom);
+          camera.targetYaw += deltaX * sensitivity;
+          camera.targetPitch += deltaY * sensitivity;
+
+          const maxPitch = Math.PI * 0.34;
+          camera.targetPitch = Math.max(-maxPitch, Math.min(maxPitch, camera.targetPitch));
+        }
+      });
+
+      window.addEventListener('mouseup', (e) => {
+        if (e.button === 0 && pointer.isDragging) {
+          pointer.isDragging = false;
+          container.classList.remove('is-dragging');
+        }
+      });
+
+      window.addEventListener('mouseleave', () => {
+        pointer.active = false;
+        pointer.isDragging = false;
+        container.classList.remove('is-dragging');
+      });
+
+      window.addEventListener('wheel', (e) => {
+        e.preventDefault();
+
+        const halfW = viewW * 0.5;
+        const halfH = viewH * 0.5;
+        const cursorX = e.clientX;
+        const cursorY = e.clientY;
+
+        const anchorRelX = (cursorX - halfW - camera.targetPanOffsetX) / camera.targetZoom;
+        const anchorRelY = (cursorY - halfH - camera.targetPanOffsetY) / camera.targetZoom;
+
+        const zoomFactor = Math.exp(-e.deltaY * CONFIG.ZOOM_SENSITIVITY);
+        const nextZoom = Math.min(
+          CONFIG.MAX_ZOOM,
+          Math.max(CONFIG.MIN_ZOOM, camera.targetZoom * zoomFactor)
+        );
+
+        camera.targetZoom = nextZoom;
+        camera.targetPanOffsetX = cursorX - halfW - anchorRelX * nextZoom;
+        camera.targetPanOffsetY = cursorY - halfH - anchorRelY * nextZoom;
+
+        if (nextZoom <= 1.02) {
+          camera.targetPanOffsetX *= 0.35;
+          camera.targetPanOffsetY *= 0.35;
+        }
+      }, { passive: false });
+
+      let resizeTimer = null;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          resizeViewport();
+        }, 150);
+      });
+    }
+
+    function init() {
+      resizeViewport();
+      bindEvents();
+
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.src = CONFIG.IMAGE_URL;
+
+      img.onload = () => {
+        samplePureParticlesFromOffscreenImage(img);
+        requestAnimationFrame(animate);
+      };
+
+      img.onerror = () => {
+        console.error('图片加载失败，请检查网络连接或通过本地服务器预览');
+      };
+    }
+
+    init();
+  </script>
+</body>
+</html>

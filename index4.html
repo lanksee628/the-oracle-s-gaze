@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE STRIVER — 3D Particle & Sculpted Typography</title>
+<!-- 引入具有古典锐利雕刻感与华丽衬线气质的字体 (Cinzel Decorative / Cinzel / Cormorant Garamond) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700;800&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,500;1,600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-color: #070709;
+    --text-silver-light: #f0f2f5;
+    --text-silver-mid: #a4aab3;
+    --text-silver-dark: #4c5159;
+    --accent-cyan: rgba(0, 240, 255, 0.85);
+    --accent-magenta: rgba(255, 25, 115, 0.85);
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-color);
+    color: var(--text-silver-light);
+    overflow: hidden;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  /* 页面进入时的平滑渐显效果 */
+  body {
+    animation: pageEnterFade 0.85s ease-out forwards;
+  }
+
+  @keyframes pageEnterFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* ================= 跳转转场特效层：雕刻金属扫描闪光与暗场融合 ================= */
+  #identity-transition-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(circle at 50% 42%, rgba(215, 238, 255, 0.85) 0%, rgba(110, 155, 220, 0.35) 38%, #030508 82%);
+  }
+
+  #identity-transition-veil.is-active {
+    pointer-events: auto;
+    animation: identityRecordFlash 0.88s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes identityRecordFlash {
+    0% {
+      opacity: 0;
+      transform: scale(0.92);
+    }
+    35% {
+      opacity: 0.9;
+      transform: scale(1.03);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1.08);
+      background: #030508;
+    }
+  }
+
+  /* 暗黑微噪点氛围背景 */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(circle at 62% 50%, rgba(28, 32, 42, 0.42) 0%, rgba(7, 7, 9, 0.96) 72%),
+      radial-gradient(circle at 28% 40%, rgba(22, 24, 30, 0.30) 0%, transparent 55%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* 全屏无分割主舞台 */
+  .stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  /* 全屏铺展的原生 Canvas 3D 粒子层 */
+  .canvas-backdrop {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 1.1s ease-out;
+  }
+
+  .canvas-backdrop.is-visible {
+    opacity: 1;
+  }
+
+  #particle-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: crosshair;
+  }
+
+  /* ================= 悬浮于画布之上的可点击通透文字层 ================= */
+  .text-overlay {
+    position: fixed;
+    top: 47%;
+    left: clamp(28px, 6.5vw, 110px);
+    transform: translateY(-42%);
+    z-index: 10;
+    background: transparent;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1.4s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 1.4s cubic-bezier(0.22, 1, 0.36, 1),
+                filter 0.6s ease;
+  }
+
+  .text-overlay.is-visible {
+    opacity: 1;
+    transform: translateY(-50%);
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  /* 鼠标悬停整个文字区域时提供微妙发光引导 */
+  .text-overlay.is-visible:hover .subtitle,
+  .text-overlay.is-visible:hover .description {
+    filter: brightness(1.18);
+  }
+
+  .text-overlay.is-visible:hover .tag-item {
+    border-color: rgba(175, 242, 255, 0.68);
+    box-shadow: 0 0 12px rgba(135, 232, 255, 0.25);
+  }
+
+  /* 点击文字跳转时的离场动画 */
+  .text-overlay.is-leaving {
+    opacity: 0 !important;
+    transform: translateY(-54%) scale(1.04) !important;
+    filter: blur(6px);
+    transition: opacity 0.55s ease, transform 0.55s ease, filter 0.55s ease !important;
+  }
+
+  /* 主标题容器 */
+  .hero-title-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 12px;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  .hero-title-dom {
+    font-family: 'Cinzel Decorative', 'Cinzel', serif;
+    font-weight: 900;
+    font-size: clamp(2.55rem, 4.45vw, 4.65rem);
+    line-height: 1.08;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: linear-gradient(180deg, #ffffff 0%, #cfd5de 42%, #7d8490 54%, #d8dee8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #title-gl-canvas {
+    position: absolute;
+    top: 50%;
+    left: -24px;
+    transform: translateY(-50%);
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 2;
+  }
+
+  .glitch-ghost-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    font-family: 'Cinzel Decorative', 'Cinzel', serif;
+    font-weight: 900;
+    font-size: clamp(2.55rem, 4.45vw, 4.65rem);
+    line-height: 1.08;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0;
+    transition: letter-spacing 0.24s cubic-bezier(0.25, 1, 0.5, 1),
+                opacity 0.14s ease-out;
+  }
+
+  .glitch-ghost-layer.active {
+    opacity: 1;
+  }
+
+  .ghost-base {
+    position: relative;
+    color: #eef2f7;
+    text-shadow:
+      0 1px 0 #8d949e,
+      0 2px 0 #555b64,
+      0 4px 12px rgba(0, 0, 0, 0.92);
+  }
+
+  .ghost-cyan,
+  .ghost-magenta {
+    position: absolute;
+    top: 0;
+    left: 0;
+    white-space: nowrap;
+    mix-blend-mode: screen;
+    filter: blur(1.6px);
+    pointer-events: none;
+  }
+
+  .ghost-cyan {
+    color: var(--accent-cyan);
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.65);
+  }
+
+  .ghost-magenta {
+    color: var(--accent-magenta);
+    text-shadow: 0 0 8px rgba(255, 25, 115, 0.65);
+  }
+
+  .subtitle {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-style: italic;
+    font-weight: 600;
+    font-size: clamp(1.5rem, 2.25vw, 2.25rem);
+    letter-spacing: 0.04em;
+    margin-top: 4px;
+    margin-bottom: 24px;
+    background: linear-gradient(180deg, #f2f5fa 0%, #aeb5c0 60%, #78808c 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.95));
+    transition: filter 0.3s ease;
+  }
+
+  .tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 30px;
+    font-family: 'Cinzel', serif;
+    font-size: clamp(0.9rem, 1.12vw, 1.12rem);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: #c8cfd9;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.98), 0 0 14px rgba(0, 0, 0, 0.85);
+  }
+
+  .tag-item {
+    position: relative;
+    padding: 4px 11px;
+    border: 1px solid rgba(200, 207, 217, 0.28);
+    background: transparent;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .tag-sep {
+    color: rgba(180, 187, 198, 0.45);
+    font-weight: 400;
+  }
+
+  .description {
+    max-width: 510px;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(1.24rem, 1.54vw, 1.54rem);
+    font-weight: 500;
+    line-height: 1.66;
+    letter-spacing: 0.025em;
+    color: #e6f4f8;
+    text-shadow:
+      0 0 10px rgba(175, 242, 255, 0.55),
+      0 0 22px rgba(120, 228, 255, 0.34),
+      0 2px 8px rgba(0, 0, 0, 0.95);
+    border-left: 1px solid rgba(175, 242, 255, 0.48);
+    box-shadow: -6px 0 18px -8px rgba(155, 238, 255, 0.42);
+    padding-left: 18px;
+    transition: filter 0.3s ease;
+  }
+
+  @media (max-width: 768px) {
+    .text-overlay {
+      top: 40%;
+      left: 20px;
+      right: 20px;
+    }
+    .hero-title-dom,
+    .glitch-ghost-layer {
+      font-size: clamp(2.0rem, 7.6vw, 2.8rem);
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- 雕刻金属扫描闪光转场光幕 -->
+<div id="identity-transition-veil"></div>
+
+<main class="stage">
+  <div class="canvas-backdrop" id="canvasBackdrop">
+    <canvas id="particle-canvas"></canvas>
+  </div>
+
+  <!-- 可点击跳转至 index5.html 的悬浮文本层 -->
+  <div class="text-overlay" id="textOverlay" title="Click text to record your Cyber Disc">
+    <div class="hero-title-wrapper" id="heroTitleWrapper">
+      <h1 class="hero-title-dom" id="heroTitleDom">THE STRIVER</h1>
+      <canvas id="title-gl-canvas"></canvas>
+      <div class="glitch-ghost-layer" id="glitchLayer" aria-hidden="true">
+        <span class="ghost-base" id="ghostBase">THE STRIVER</span>
+        <span class="ghost-cyan" id="ghostCyan">THE STRIVER</span>
+        <span class="ghost-magenta" id="ghostMagenta">THE STRIVER</span>
+      </div>
+    </div>
+
+    <div class="subtitle" id="subTitle">The Ambitious Pursuer</div>
+
+    <div class="tags-row" id="tagsRow">
+      <span class="tag-item">#Ambition</span>
+      <span class="tag-sep">/</span>
+      <span class="tag-item">#Drive</span>
+      <span class="tag-sep">/</span>
+      <span class="tag-item">#Pressure</span>
+    </div>
+
+    <p class="description" id="descText">
+      You are driven by ambition, constantly seeking progress while carrying the pressure of expectations.
+    </p>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+const CONFIG = {
+  IMAGE_URL: "https://raw.githubusercontent.com/lanksee628/my-image/ca322bb6501f31797881ed60b3751cddb453112f/page4.png",
+  TARGET_NEXT_PAGE: "index5.html",
+
+  TEXT: {
+    MAIN_TITLE: "THE STRIVER",
+    SUB_TITLE: "The Ambitious Pursuer",
+    TAGS: ["#Ambition", "#Drive", "#Pressure"],
+    DESCRIPTION: "You are driven by ambition, constantly seeking progress while carrying the pressure of expectations."
+  },
+
+  IMAGE_CROP: {
+    WHITE_BORDER_THRESHOLD: 238,
+    AUTO_CROP_WHITE_BORDER: true,
+    REGION_START_X: 0.34,
+    REGION_END_X: 0.995,
+    TOP_MARGIN_RATIO: 0.01,
+    BOTTOM_MARGIN_RATIO: 0.99,
+    CANVAS_CENTER_X_RATIO: 0.65,
+    CANVAS_CENTER_Y_RATIO: 0.50,
+    VIEWPORT_FIT_PADDING: 0.90
+  },
+
+  PARTICLES: {
+    SAMPLE_STEP: 3,
+    BRIGHTNESS_MIN: 22,
+    BRIGHTNESS_MAX: 244,
+    COLOR_SATURATION_BOOST: 1.04,
+    DEPTH_SCALE: 190,
+    PERSPECTIVE_FOV: 540,
+    BASE_POINT_SIZE: 1.55,
+    FLOAT_AMPLITUDE: 3.2,
+    FLOAT_SPEED: 0.0011,
+    HOVER_RADIUS: 115,
+    HOVER_EXPANSION: 0.14,
+    HOVER_SWIRL: 2.2,
+    SPRING_EASE: 0.065
+  },
+
+  TITLE_3D_RELIEF: {
+    BUMP_HEIGHT: 14.0,
+    INFLUENCE_RADIUS: 130.0,
+    SPECULAR_INTENSITY: 1.45,
+    BEVEL_SHARPNESS: 2.6,
+    AMBIENT_LIGHT: 0.38
+  },
+
+  TITLE_PULSE: {
+    IDLE_WAIT_MIN: 2200,
+    IDLE_WAIT_MAX: 3000,
+    PULSE_DURATION: 420,
+    LETTER_SPREAD_EM: 0.125,
+    GHOST_OFFSET_PX: 5.5,
+    SCRAMBLE_INTERVAL: 48,
+    GLYPH_POOL: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&$§∆ΩΨ"
+  },
+
+  ENTRANCE: {
+    TEXT_FADE_DELAY_MS: 650
+  }
+};
+
+function applyTextConfig() {
+  document.getElementById("heroTitleDom").textContent = CONFIG.TEXT.MAIN_TITLE;
+  document.getElementById("ghostBase").textContent = CONFIG.TEXT.MAIN_TITLE;
+  document.getElementById("ghostCyan").textContent = CONFIG.TEXT.MAIN_TITLE;
+  document.getElementById("ghostMagenta").textContent = CONFIG.TEXT.MAIN_TITLE;
+  document.getElementById("subTitle").textContent = CONFIG.TEXT.SUB_TITLE;
+  document.getElementById("descText").textContent = CONFIG.TEXT.DESCRIPTION;
+
+  const tagsRow = document.getElementById("tagsRow");
+  tagsRow.innerHTML = CONFIG.TEXT.TAGS.map((tag, idx) => {
+    const sep = idx < CONFIG.TEXT.TAGS.length - 1 ? `<span class="tag-sep">/</span>` : "";
+    return `<span class="tag-item">${tag}</span>${sep}`;
+  }).join("");
+}
+
+class ParticleSculptureEngine {
+  constructor(canvas, onReadyCallback) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d", { alpha: true });
+    this.onReady = onReadyCallback;
+
+    this.particles = [];
+    this.width = 0;
+    this.height = 0;
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    this.mouse = {
+      x: -9999,
+      y: -9999,
+      normX: 0,
+      normY: 0,
+      active: false
+    };
+
+    this.smoothCam = { x: 0, y: 0 };
+    this.time = 0;
+    this.isReady = false;
+    this.isDispersingOut = false;
+    this.disperseProgress = 0;
+
+    this.bindEvents();
+    this.resize();
+    this.loadAndSampleImage(CONFIG.IMAGE_URL);
+  }
+
+  /**
+   * 触发粒子离场聚合/光速星散特效
+   */
+  triggerExitDisperse() {
+    this.isDispersingOut = true;
+    const centerX = this.imgCenter ? this.imgCenter.x : this.width * 0.65;
+    const centerY = this.imgCenter ? this.imgCenter.y : this.height * 0.5;
+
+    for (let i = 0; i < this.particles.length; i++) {
+      const p = this.particles[i];
+      const angle = Math.atan2(p.oy - centerY, p.ox - centerX) + (Math.random() - 0.5) * 0.5;
+      const speed = 12 + Math.random() * 28;
+      p.exitVx = Math.cos(angle) * speed;
+      p.exitVy = Math.sin(angle) * speed;
+      p.exitVz = 22 + Math.random() * 35;
+    }
+  }
+
+  bindEvents() {
+    window.addEventListener("resize", () => this.resize());
+
+    window.addEventListener("mousemove", (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      this.mouse.x = e.clientX - rect.left;
+      this.mouse.y = e.clientY - rect.top;
+      this.mouse.normX = (this.mouse.x / rect.width - 0.5) * 2;
+      this.mouse.normY = (this.mouse.y / rect.height - 0.5) * 2;
+      this.mouse.active = true;
+    });
+
+    window.addEventListener("mouseleave", () => {
+      this.mouse.active = false;
+      this.mouse.normX = 0;
+      this.mouse.normY = 0;
+    });
+  }
+
+  resize() {
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
+    this.canvas.width = this.width * this.dpr;
+    this.canvas.height = this.height * this.dpr;
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+
+    if (this.rawImageData) {
+      this.buildParticlesFromImageData(this.rawImageData);
+    }
+  }
+
+  loadAndSampleImage(url) {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      this.extractCleanRegion(img);
+    };
+    img.onerror = () => {
+      this.generateFallbackSculpture();
+    };
+    img.src = url;
+  }
+
+  extractCleanRegion(img) {
+    const offCanvas = document.createElement("canvas");
+    const offCtx = offCanvas.getContext("2d");
+    offCanvas.width = img.width;
+    offCanvas.height = img.height;
+    offCtx.drawImage(img, 0, 0);
+
+    const fullData = offCtx.getImageData(0, 0, img.width, img.height);
+    const data = fullData.data;
+    const w = img.width;
+    const h = img.height;
+    const th = CONFIG.IMAGE_CROP.WHITE_BORDER_THRESHOLD;
+
+    let minX = 0, maxX = w - 1, minY = 0, maxY = h - 1;
+    if (CONFIG.IMAGE_CROP.AUTO_CROP_WHITE_BORDER) {
+      const isWhitePixel = (x, y) => {
+        const idx = (y * w + x) * 4;
+        return data[idx] >= th && data[idx + 1] >= th && data[idx + 2] >= th;
+      };
+
+      topLoop: for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x += 4) {
+          if (!isWhitePixel(x, y)) { minY = y; break topLoop; }
+        }
+      }
+      bottomLoop: for (let y = h - 1; y >= minY; y--) {
+        for (let x = 0; x < w; x += 4) {
+          if (!isWhitePixel(x, y)) { maxY = y; break bottomLoop; }
+        }
+      }
+      leftLoop: for (let x = 0; x < w; x++) {
+        for (let y = minY; y <= maxY; y += 4) {
+          if (!isWhitePixel(x, y)) { minX = x; break leftLoop; }
+        }
+      }
+      rightLoop: for (let x = w - 1; x >= minX; x--) {
+        for (let y = minY; y <= maxY; y += 4) {
+          if (!isWhitePixel(x, y)) { maxX = x; break rightLoop; }
+        }
+      }
+    }
+
+    const cleanW = Math.max(10, maxX - minX + 1);
+    const cleanH = Math.max(10, maxY - minY + 1);
+
+    const cropX = Math.floor(minX + cleanW * CONFIG.IMAGE_CROP.REGION_START_X);
+    const cropY = Math.floor(minY + cleanH * CONFIG.IMAGE_CROP.TOP_MARGIN_RATIO);
+    const cropW = Math.floor(cleanW * (CONFIG.IMAGE_CROP.REGION_END_X - CONFIG.IMAGE_CROP.REGION_START_X));
+    const cropH = Math.floor(cleanH * (CONFIG.IMAGE_CROP.BOTTOM_MARGIN_RATIO - CONFIG.IMAGE_CROP.TOP_MARGIN_RATIO));
+
+    const cropCanvas = document.createElement("canvas");
+    cropCanvas.width = cropW;
+    cropCanvas.height = cropH;
+    const cropCtx = cropCanvas.getContext("2d");
+    cropCtx.drawImage(offCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    this.rawImageData = cropCtx.getImageData(0, 0, cropW, cropH);
+    this.buildParticlesFromImageData(this.rawImageData);
+
+    if (!this.isReady) {
+      this.isReady = true;
+      if (this.onReady) this.onReady();
+      this.startLoop();
+    }
+  }
+
+  buildParticlesFromImageData(imgData) {
+    const { width: srcW, height: srcH, data } = imgData;
+    const particles = [];
+
+    const fitPad = CONFIG.IMAGE_CROP.VIEWPORT_FIT_PADDING;
+    const maxAvailW = this.width * 0.68;
+    const maxAvailH = this.height * fitPad;
+    const scale = Math.min(maxAvailW / srcW, maxAvailH / srcH);
+
+    const renderW = srcW * scale;
+    const renderH = srcH * scale;
+
+    let targetCenterX = this.width * CONFIG.IMAGE_CROP.CANVAS_CENTER_X_RATIO;
+    const halfW = renderW * 0.5;
+    if (targetCenterX + halfW > this.width - 24) {
+      targetCenterX = this.width - 24 - halfW;
+    }
+    if (targetCenterX - halfW < 24) {
+      targetCenterX = 24 + halfW;
+    }
+
+    const targetCenterY = this.height * CONFIG.IMAGE_CROP.CANVAS_CENTER_Y_RATIO;
+    const offsetX = targetCenterX - renderW * 0.5;
+    const offsetY = targetCenterY - renderH * 0.5;
+
+    this.imgCenter = { x: targetCenterX, y: targetCenterY };
+
+    const step = CONFIG.PARTICLES.SAMPLE_STEP;
+    const bMin = CONFIG.PARTICLES.BRIGHTNESS_MIN;
+    const bMax = CONFIG.PARTICLES.BRIGHTNESS_MAX;
+    const satBoost = CONFIG.PARTICLES.COLOR_SATURATION_BOOST;
+
+    for (let y = 0; y < srcH; y += step) {
+      for (let x = 0; x < srcW; x += step) {
+        const idx = (y * srcW + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const a = data[idx + 3];
+
+        if (a < 60) continue;
+
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        if (lum < bMin || lum > bMax) continue;
+
+        const normLum = (lum - bMin) / (bMax - bMin);
+        if (Math.random() > Math.pow(normLum, 0.72) * 0.92 + 0.08) continue;
+
+        const baseX = offsetX + (x + (Math.random() - 0.5) * step * 0.8) * scale;
+        const baseY = offsetY + (y + (Math.random() - 0.5) * step * 0.8) * scale;
+
+        const radialDx = (x / srcW - 0.5) * 2;
+        const radialDy = (y / srcH - 0.5) * 2;
+        const edgeFalloff = Math.max(0, 1 - (radialDx * radialDx + radialDy * radialDy) * 0.45);
+        const baseZ = ((normLum - 0.42) * 0.78 + edgeFalloff * 0.22) * CONFIG.PARTICLES.DEPTH_SCALE;
+
+        const origR = Math.min(255, Math.max(0, Math.round(lum + (r - lum) * satBoost)));
+        const origG = Math.min(255, Math.max(0, Math.round(lum + (g - lum) * satBoost)));
+        const origB = Math.min(255, Math.max(0, Math.round(lum + (b - lum) * satBoost)));
+        const alpha = Math.min(1, (0.48 + normLum * 0.52) * (a / 255));
+
+        particles.push({
+          ox: baseX,
+          oy: baseY,
+          oz: baseZ,
+          dx: 0,
+          dy: 0,
+          dz: 0,
+          exitVx: 0,
+          exitVy: 0,
+          exitVz: 0,
+          phaseX: Math.random() * Math.PI * 2,
+          phaseY: Math.random() * Math.PI * 2,
+          phaseZ: Math.random() * Math.PI * 2,
+          speedMul: 0.7 + Math.random() * 0.6,
+          normLum: normLum,
+          size: CONFIG.PARTICLES.BASE_POINT_SIZE * (0.55 + normLum * 0.85),
+          color: `rgba(${origR}, ${origG}, ${origB}, ${alpha.toFixed(3)})`
+        });
+      }
+    }
+
+    particles.sort((a, b) => a.oz - b.oz);
+    this.particles = particles;
+  }
+
+  generateFallbackSculpture() {
+    const size = 320;
+    const c = document.createElement("canvas");
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext("2d");
+    const grad = ctx.createRadialGradient(size * 0.5, size * 0.45, 12, size * 0.5, size * 0.5, size * 0.44);
+    grad.addColorStop(0, "rgb(235, 195, 130)");
+    grad.addColorStop(0.55, "rgb(130, 105, 85)");
+    grad.addColorStop(1, "rgb(10, 10, 12)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    this.rawImageData = ctx.getImageData(0, 0, size, size);
+    this.buildParticlesFromImageData(this.rawImageData);
+    if (!this.isReady) {
+      this.isReady = true;
+      if (this.onReady) this.onReady();
+      this.startLoop();
+    }
+  }
+
+  startLoop() {
+    const tick = (now) => {
+      this.time = now;
+      this.updateAndRender();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  updateAndRender() {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.width, this.height);
+
+    const centerX = this.imgCenter ? this.imgCenter.x : this.width * 0.65;
+    const centerY = this.imgCenter ? this.imgCenter.y : this.height * 0.5;
+    const fov = CONFIG.PARTICLES.PERSPECTIVE_FOV;
+    const floatAmp = CONFIG.PARTICLES.FLOAT_AMPLITUDE;
+    const floatFreq = this.time * CONFIG.PARTICLES.FLOAT_SPEED;
+
+    const targetCamX = this.mouse.normX * 26;
+    const targetCamY = this.mouse.normY * 18;
+    this.smoothCam.x += (targetCamX - this.smoothCam.x) * 0.04;
+    this.smoothCam.y += (targetCamY - this.smoothCam.y) * 0.04;
+
+    const hoverR = CONFIG.PARTICLES.HOVER_RADIUS;
+    const hoverR2 = hoverR * hoverR;
+    const expansionStrength = CONFIG.PARTICLES.HOVER_EXPANSION;
+    const swirlStrength = CONFIG.PARTICLES.HOVER_SWIRL;
+    const ease = CONFIG.PARTICLES.SPRING_EASE;
+
+    const list = this.particles;
+    const len = list.length;
+
+    for (let i = 0; i < len; i++) {
+      const p = list[i];
+
+      if (this.isDispersingOut) {
+        p.dx += p.exitVx;
+        p.dy += p.exitVy;
+        p.dz += p.exitVz;
+      } else {
+        const t = floatFreq * p.speedMul;
+        const floatX = Math.sin(t + p.phaseX) * floatAmp;
+        const floatY = Math.cos(t * 0.9 + p.phaseY) * floatAmp;
+        const floatZ = Math.sin(t * 0.75 + p.phaseZ) * (floatAmp * 2.2);
+
+        let targetDx = 0;
+        let targetDy = 0;
+        let targetDz = 0;
+
+        if (this.mouse.active) {
+          const vx = (p.ox + floatX) - this.mouse.x;
+          const vy = (p.oy + floatY) - this.mouse.y;
+          const dist2 = vx * vx + vy * vy;
+
+          if (dist2 < hoverR2 && dist2 > 0.001) {
+            const dist = Math.sqrt(dist2);
+            const normDist = dist / hoverR;
+            const bellFalloff = Math.sin(normDist * Math.PI) * (1.0 - normDist * 0.45);
+
+            targetDx = vx * expansionStrength * bellFalloff - (vy / dist) * swirlStrength * bellFalloff;
+            targetDy = vy * expansionStrength * bellFalloff + (vx / dist) * swirlStrength * bellFalloff;
+            targetDz = 14.0 * bellFalloff;
+          }
+        }
+
+        p.dx += (targetDx - p.dx) * ease;
+        p.dy += (targetDy - p.dy) * ease;
+        p.dz += (targetDz - p.dz) * ease;
+      }
+
+      const t = floatFreq * p.speedMul;
+      const floatX = this.isDispersingOut ? 0 : Math.sin(t + p.phaseX) * floatAmp;
+      const floatY = this.isDispersingOut ? 0 : Math.cos(t * 0.9 + p.phaseY) * floatAmp;
+      const floatZ = this.isDispersingOut ? 0 : Math.sin(t * 0.75 + p.phaseZ) * (floatAmp * 2.2);
+
+      const worldX = p.ox - centerX + floatX + p.dx - this.smoothCam.x * (p.oz / 140);
+      const worldY = p.oy - centerY + floatY + p.dy - this.smoothCam.y * (p.oz / 140);
+      const worldZ = p.oz + floatZ + p.dz;
+
+      const perspective = fov / Math.max(80, fov - worldZ);
+      const screenX = centerX + worldX * perspective;
+      const screenY = centerY + worldY * perspective;
+      const radius = Math.max(0.45, p.size * perspective);
+
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+class SculptedTitleGL {
+  constructor(domElement, canvasElement) {
+    this.domEl = domElement;
+    this.canvas = canvasElement;
+    this.text = CONFIG.TEXT.MAIN_TITLE;
+    this.isPulseHidden = false;
+
+    this.mouseUV = new THREE.Vector2(0.5, 0.5);
+    this.targetHover = 0.0;
+    this.currentHover = 0.0;
+
+    this.initThree();
+    this.buildTextReliefTexture();
+    this.bindEvents();
+    this.animate();
+  }
+
+  initThree() {
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+    this.camera.position.z = 2;
+
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      alpha: true,
+      antialias: true
+    });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    const vertexShader = `
+      uniform float uTime;
+      uniform vec2 uMouse;
+      uniform vec2 uResolution;
+      uniform float uHover;
+      uniform float uBumpHeight;
+      uniform float uRadius;
+
+      varying vec2 vUv;
+      varying float vElevation;
+
+      float quinticOut(float t) {
+        return 1.0 - pow(1.0 - clamp(t, 0.0, 1.0), 5.0);
+      }
+
+      void main() {
+        vUv = uv;
+        vec3 pos = position;
+
+        vec2 pixelPos = uv * uResolution;
+        vec2 mousePixel = uMouse * uResolution;
+
+        float autoScanX = (0.5 + 0.42 * sin(uTime * 0.75)) * uResolution.x;
+        vec2 autoFocus = vec2(autoScanX, uResolution.y * 0.5);
+        vec2 activeFocus = mix(autoFocus, mousePixel, uHover);
+
+        float dist = distance(pixelPos, activeFocus);
+        float normalizedDist = clamp(1.0 - dist / max(1.0, uRadius), 0.0, 1.0);
+        float bulge = quinticOut(normalizedDist) * smoothstep(0.0, 1.0, normalizedDist);
+
+        float elevation = bulge * (uBumpHeight * mix(0.35, 1.0, uHover));
+        pos.z += elevation * 0.015;
+        vElevation = elevation;
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `;
+
+    const fragmentShader = `
+      uniform sampler2D uHeightMap;
+      uniform vec2 uTexelSize;
+      uniform vec2 uMouse;
+      uniform vec2 uResolution;
+      uniform float uHover;
+      uniform float uTime;
+      uniform float uBumpHeight;
+      uniform float uRadius;
+      uniform float uSpecular;
+      uniform float uBevelSharpness;
+      uniform float uAmbient;
+
+      varying vec2 vUv;
+      varying float vElevation;
+
+      void main() {
+        vec4 centerSample = texture2D(uHeightMap, vUv);
+        float alpha = centerSample.a;
+        if (alpha < 0.04) discard;
+
+        float hL = texture2D(uHeightMap, vUv - vec2(uTexelSize.x, 0.0)).r;
+        float hR = texture2D(uHeightMap, vUv + vec2(uTexelSize.x, 0.0)).r;
+        float hD = texture2D(uHeightMap, vUv - vec2(0.0, uTexelSize.y)).r;
+        float hU = texture2D(uHeightMap, vUv + vec2(0.0, uTexelSize.y)).r;
+
+        float strength = (uBumpHeight * 0.22) * uBevelSharpness;
+        vec3 normal = normalize(vec3((hL - hR) * strength, (hD - hU) * strength, 1.0));
+
+        vec2 autoLight = vec2(0.5 + 0.45 * sin(uTime * 0.75), 0.65 + 0.2 * cos(uTime * 0.5));
+        vec2 lightUv = mix(autoLight, uMouse, uHover);
+
+        vec2 pixelPos = vUv * uResolution;
+        vec2 lightPixel = lightUv * uResolution;
+        float dist = distance(pixelPos, lightPixel);
+        float radialAtten = smoothstep(uRadius * 1.45, 0.0, dist);
+
+        vec3 lightDir = normalize(vec3((lightUv.x - vUv.x) * 2.4, (lightUv.y - vUv.y) * 1.8, 0.72));
+        vec3 viewDir = vec3(0.0, 0.0, 1.0);
+        vec3 halfDir = normalize(lightDir + viewDir);
+
+        float diff = max(dot(normal, lightDir), 0.0);
+        float spec = pow(max(dot(normal, halfDir), 0.0), 34.0) * uSpecular * (0.45 + 0.75 * radialAtten);
+
+        float ridge = centerSample.r;
+        vec3 darkMetalBase = vec3(0.18, 0.20, 0.23);
+        vec3 silverHighlight = vec3(0.92, 0.95, 1.0);
+        vec3 rimCoolTint = vec3(0.68, 0.74, 0.84);
+
+        vec3 color = darkMetalBase * (uAmbient + ridge * 0.55)
+                   + rimCoolTint * diff * 0.62
+                   + silverHighlight * spec;
+
+        color *= smoothstep(0.02, 0.35, alpha);
+
+        gl_FragColor = vec4(color, alpha);
+      }
+    `;
+
+    this.uniforms = {
+      uTime: { value: 0 },
+      uMouse: { value: new THREE.Vector2(0.5, 0.5) },
+      uResolution: { value: new THREE.Vector2(500, 100) },
+      uTexelSize: { value: new THREE.Vector2(1 / 500, 1 / 100) },
+      uHover: { value: 0 },
+      uHeightMap: { value: null },
+      uBumpHeight: { value: CONFIG.TITLE_3D_RELIEF.BUMP_HEIGHT },
+      uRadius: { value: CONFIG.TITLE_3D_RELIEF.INFLUENCE_RADIUS },
+      uSpecular: { value: CONFIG.TITLE_3D_RELIEF.SPECULAR_INTENSITY },
+      uBevelSharpness: { value: CONFIG.TITLE_3D_RELIEF.BEVEL_SHARPNESS },
+      uAmbient: { value: CONFIG.TITLE_3D_RELIEF.AMBIENT_LIGHT }
+    };
+
+    const geometry = new THREE.PlaneGeometry(2, 2, 64, 16);
+    const material = new THREE.ShaderMaterial({
+      uniforms: this.uniforms,
+      vertexShader,
+      fragmentShader,
+      transparent: true
+    });
+
+    this.mesh = new THREE.Mesh(geometry, material);
+    this.scene.add(this.mesh);
+  }
+
+  buildTextReliefTexture() {
+    const rect = this.domEl.getBoundingClientRect();
+    const padX = 24;
+    const padY = 18;
+    const w = Math.max(120, Math.ceil(rect.width + padX * 2));
+    const h = Math.max(48, Math.ceil(rect.height + padY * 2));
+
+    this.canvas.style.width = `${w}px`;
+    this.canvas.style.height = `${h}px`;
+    this.renderer.setSize(w, h, false);
+
+    const dpr = 2;
+    const off = document.createElement("canvas");
+    off.width = w * dpr;
+    off.height = h * dpr;
+    const ctx = off.getContext("2d");
+    ctx.scale(dpr, dpr);
+
+    const computed = window.getComputedStyle(this.domEl);
+    const fontStr = `${computed.fontWeight} ${computed.fontSize} ${computed.fontFamily}`;
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = fontStr;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    if ("letterSpacing" in ctx) {
+      ctx.letterSpacing = computed.letterSpacing;
+    }
+
+    const layers = 8;
+    for (let i = 0; i < layers; i++) {
+      const ratio = (i + 1) / layers;
+      const lum = Math.floor(55 + ratio * 200);
+      ctx.shadowColor = `rgba(${lum}, ${lum}, ${lum}, 0.85)`;
+      ctx.shadowBlur = (layers - i) * 1.45;
+      ctx.fillStyle = `rgb(${lum}, ${lum}, ${lum})`;
+      ctx.fillText(this.text, padX, h * 0.5);
+    }
+
+    const texture = new THREE.CanvasTexture(off);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+
+    this.uniforms.uHeightMap.value = texture;
+    this.uniforms.uResolution.value.set(w, h);
+    this.uniforms.uTexelSize.value.set(1.35 / w, 1.35 / h);
+  }
+
+  bindEvents() {
+    window.addEventListener("resize", () => {
+      this.buildTextReliefTexture();
+    });
+
+    this.canvas.addEventListener("mousemove", (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const u = (e.clientX - rect.left) / rect.width;
+      const v = 1.0 - (e.clientY - rect.top) / rect.height;
+      this.mouseUV.set(u, v);
+      this.targetHover = 1.0;
+    });
+
+    this.canvas.addEventListener("mouseleave", () => {
+      this.targetHover = 0.0;
+    });
+  }
+
+  setPulseVisibility(isPulsing) {
+    this.isPulseHidden = isPulsing;
+    this.canvas.style.opacity = isPulsing ? "0" : "1";
+  }
+
+  animate() {
+    const loop = (now) => {
+      this.uniforms.uTime.value = now * 0.001;
+      this.currentHover += (this.targetHover - this.currentHover) * 0.08;
+      this.uniforms.uHover.value = this.currentHover;
+      this.uniforms.uMouse.value.lerp(this.mouseUV, 0.14);
+
+      if (!this.isPulseHidden) {
+        this.renderer.render(this.scene, this.camera);
+      }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+}
+
+class TitlePulseController {
+  constructor(titleGL) {
+    this.titleGL = titleGL;
+    this.originalText = CONFIG.TEXT.MAIN_TITLE;
+
+    this.glitchLayer = document.getElementById("glitchLayer");
+    this.ghostBase = document.getElementById("ghostBase");
+    this.ghostCyan = document.getElementById("ghostCyan");
+    this.ghostMagenta = document.getElementById("ghostMagenta");
+
+    this.isPulsing = false;
+    this.scheduleNextPulse();
+  }
+
+  scheduleNextPulse() {
+    const { IDLE_WAIT_MIN, IDLE_WAIT_MAX } = CONFIG.TITLE_PULSE;
+    const waitMs = IDLE_WAIT_MIN + Math.random() * (IDLE_WAIT_MAX - IDLE_WAIT_MIN);
+    setTimeout(() => this.triggerPulse(), waitMs);
+  }
+
+  generateScrambledText(progress) {
+    const pool = CONFIG.TITLE_PULSE.GLYPH_POOL;
+    const chars = this.originalText.split("");
+    const scrambleProb = Math.sin(progress * Math.PI) * 0.88;
+
+    return chars.map((ch) => {
+      if (ch === " ") return " ";
+      if (Math.random() < scrambleProb) {
+        return pool[Math.floor(Math.random() * pool.length)];
+      }
+      return ch;
+    }).join("");
+  }
+
+  triggerPulse(isExitBurst = false) {
+    if (this.isPulsing && !isExitBurst) return;
+    this.isPulsing = true;
+
+    const duration = isExitBurst ? 550 : CONFIG.TITLE_PULSE.PULSE_DURATION;
+    const maxSpread = isExitBurst ? 0.28 : CONFIG.TITLE_PULSE.LETTER_SPREAD_EM;
+    const maxOffset = isExitBurst ? 14.0 : CONFIG.TITLE_PULSE.GHOST_OFFSET_PX;
+    const scrambleStep = CONFIG.TITLE_PULSE.SCRAMBLE_INTERVAL;
+
+    const startTime = performance.now();
+    let lastScrambleTime = 0;
+
+    this.titleGL.setPulseVisibility(true);
+    this.glitchLayer.classList.add("active");
+
+    const step = (now) => {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / duration);
+
+      const envelope = isExitBurst
+        ? Math.sin(t * Math.PI * 0.5)
+        : (t < 0.4 ? Math.sin((t / 0.4) * (Math.PI * 0.5)) : Math.cos(((t - 0.4) / 0.6) * (Math.PI * 0.5)));
+
+      const baseSpacing = 0.06;
+      const currentSpacing = baseSpacing + maxSpread * envelope;
+      this.glitchLayer.style.letterSpacing = `${currentSpacing.toFixed(4)}em`;
+
+      if (now - lastScrambleTime >= scrambleStep) {
+        lastScrambleTime = now;
+        const scrambled = (!isExitBurst && t > 0.85) ? this.originalText : this.generateScrambledText(t);
+        this.ghostBase.textContent = scrambled;
+        this.ghostCyan.textContent = scrambled;
+        this.ghostMagenta.textContent = scrambled;
+      }
+
+      const jitter = (Math.random() - 0.5) * 3.0 * envelope;
+      const shiftX = maxOffset * envelope + jitter;
+      const flickerOpacity = (0.55 + Math.random() * 0.45) * envelope;
+
+      this.ghostCyan.style.transform = `translate3d(${(-shiftX).toFixed(2)}px, ${(jitter * 0.3).toFixed(2)}px, 0)`;
+      this.ghostMagenta.style.transform = `translate3d(${(shiftX).toFixed(2)}px, ${(-jitter * 0.3).toFixed(2)}px, 0)`;
+      this.ghostCyan.style.opacity = flickerOpacity.toFixed(2);
+      this.ghostMagenta.style.opacity = flickerOpacity.toFixed(2);
+
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else if (!isExitBurst) {
+        this.ghostBase.textContent = this.originalText;
+        this.ghostCyan.textContent = this.originalText;
+        this.ghostMagenta.textContent = this.originalText;
+        this.glitchLayer.style.letterSpacing = `${baseSpacing}em`;
+        this.ghostCyan.style.transform = "translate3d(0,0,0)";
+        this.ghostMagenta.style.transform = "translate3d(0,0,0)";
+
+        this.glitchLayer.classList.remove("active");
+        this.titleGL.setPulseVisibility(false);
+        this.isPulsing = false;
+
+        this.scheduleNextPulse();
+      }
+    };
+
+    requestAnimationFrame(step);
+  }
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
+  applyTextConfig();
+
+  if (document.fonts && document.fonts.ready) {
+    await document.fonts.ready;
+  }
+
+  const canvasBackdrop = document.getElementById("canvasBackdrop");
+  const textOverlay = document.getElementById("textOverlay");
+  const transitionVeil = document.getElementById("identity-transition-veil");
+  const particleCanvas = document.getElementById("particle-canvas");
+  const titleDom = document.getElementById("heroTitleDom");
+  const titleGlCanvas = document.getElementById("title-gl-canvas");
+
+  let titleGL = null;
+  let pulseCtrl = null;
+  let isTransitioning = false;
+
+  const sculptureEngine = new ParticleSculptureEngine(particleCanvas, () => {
+    canvasBackdrop.classList.add("is-visible");
+
+    setTimeout(() => {
+      textOverlay.classList.add("is-visible");
+
+      titleGL = new SculptedTitleGL(titleDom, titleGlCanvas);
+      titleGL.buildTextReliefTexture();
+
+      pulseCtrl = new TitlePulseController(titleGL);
+    }, CONFIG.ENTRANCE.TEXT_FADE_DELAY_MS);
+  });
+
+  // 点击左侧悬浮文字区域 -> 触发主标题高能故障脉冲 + 雕塑粒子星散 + 跳转 index5.html
+  textOverlay.addEventListener("mousedown", (e) => {
+    if (e.button !== 0 || isTransitioning) return;
+    e.stopPropagation();
+    isTransitioning = true;
+
+    if (pulseCtrl) {
+      pulseCtrl.triggerPulse(true);
+    }
+    sculptureEngine.triggerExitDisperse();
+
+    textOverlay.classList.add("is-leaving");
+    transitionVeil.classList.add("is-active");
+
+    setTimeout(() => {
+      window.location.href = CONFIG.TARGET_NEXT_PAGE;
+    }, 850);
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CYBER DISC // IDENTITY RECORDED</title>
+<!-- 引入具有古典锐利雕刻感与华丽衬线气质的字体 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700;800;900&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,600&display=swap" rel="stylesheet">
+
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background-color: #030508;
+    overflow: hidden;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    font-family: 'Cinzel', 'Cormorant Garamond', 'Times New Roman', Georgia, serif;
+  }
+
+  /* 全屏主画布：冷峻科技背景 + 3D环形粒子 + 居中光盘交互 */
+  #cyber-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    background: #030508;
+    z-index: 1;
+  }
+
+  /* 光盘正下方居中文字与操作按钮容器（不遮挡光盘主体，不受画布拖拽与滚轮缩放干扰） */
+  .ui-bottom-dock {
+    position: fixed;
+    left: 50%;
+    bottom: clamp(32px, 6.2vh, 72px);
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    pointer-events: none;
+    width: min(95vw, 980px);
+  }
+
+  /* 第一行主文本：古典锐利雕刻感 + 金属暗黑浮雕效果 */
+  .identity-title {
+    font-family: 'Cinzel Decorative', 'Cinzel', 'Times New Roman', serif;
+    font-weight: 900;
+    font-size: clamp(1.34rem, 2.38vw, 2.26rem);
+    line-height: 1.22;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    white-space: nowrap;
+
+    background: linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #dce4f2 25%,
+      #8490a6 48%,
+      #272d38 54%,
+      #9aa7bd 78%,
+      #eef4fc 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter:
+      drop-shadow(0 1px 0 rgba(7, 10, 15, 0.98))
+      drop-shadow(0 3px 2px rgba(0, 0, 0, 0.96))
+      drop-shadow(0 0 14px rgba(150, 185, 235, 0.28));
+
+    opacity: 0;
+    transform: translateY(10px) translateX(-10px);
+    transition:
+      opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.95s cubic-bezier(0.22, 1, 0.36, 1),
+      letter-spacing 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* 触发显现后：文字产生轻微的横向展开与微幅横向律动 */
+  .identity-title.is-revealed {
+    opacity: 1;
+    letter-spacing: 0.145em;
+    animation: subtleHorizontalDrift 5.4s ease-in-out infinite alternate;
+  }
+
+  /* 第二行副文本：略小于第一行，同样具备金属暗黑浮雕锐利质感 */
+  .identity-subtitle {
+    margin-top: 7px;
+    font-family: 'Cinzel', 'Cormorant Garamond', 'Times New Roman', serif;
+    font-weight: 700;
+    font-size: clamp(0.88rem, 1.28vw, 1.18rem);
+    line-height: 1.3;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+
+    background: linear-gradient(
+      180deg,
+      #e6ecf8 0%,
+      #96a2b8 46%,
+      #3f4756 56%,
+      #b4c0d4 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter:
+      drop-shadow(0 1px 0 rgba(6, 8, 12, 0.98))
+      drop-shadow(0 3px 6px rgba(0, 0, 0, 0.96))
+      drop-shadow(0 0 12px rgba(145, 178, 225, 0.24));
+
+    opacity: 0;
+    transform: translateY(8px) translateX(10px);
+    transition:
+      opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.36s,
+      transform 0.95s cubic-bezier(0.22, 1, 0.36, 1) 0.36s,
+      letter-spacing 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.36s;
+  }
+
+  .identity-subtitle.is-revealed {
+    opacity: 1;
+    letter-spacing: 0.185em;
+    animation: subtleHorizontalDriftReverse 6.2s ease-in-out 0.4s infinite alternate;
+  }
+
+  @keyframes subtleHorizontalDrift {
+    0% { transform: translateY(0) translateX(-4px); }
+    100% { transform: translateY(0) translateX(4px); }
+  }
+
+  @keyframes subtleHorizontalDriftReverse {
+    0% { transform: translateY(0) translateX(3px); }
+    100% { transform: translateY(0) translateX(-3px); }
+  }
+
+  /* 操作按钮组：位于两行文字正下方，不受画布拖拽与滚轮缩放干扰 */
+  .action-buttons {
+    margin-top: clamp(14px, 2.0vh, 22px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    transition: opacity 0.75s ease 0.68s, transform 0.75s ease 0.68s;
+  }
+
+  .action-buttons.is-revealed {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  /* 赛博冷色金属感边框按钮 */
+  .cyber-btn {
+    position: relative;
+    min-width: 142px;
+    padding: 9px 30px;
+    background: linear-gradient(
+      180deg,
+      rgba(20, 27, 39, 0.86) 0%,
+      rgba(8, 12, 19, 0.92) 52%,
+      rgba(15, 21, 32, 0.88) 100%
+    );
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(158, 188, 224, 0.52);
+    border-top-color: rgba(220, 238, 255, 0.78);
+    border-bottom-color: rgba(82, 102, 130, 0.68);
+    border-radius: 2px;
+    cursor: pointer;
+    outline: none;
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.86),
+      0 0 14px rgba(145, 188, 235, 0.20),
+      inset 0 1px 0 rgba(235, 245, 255, 0.24),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.85);
+    transition:
+      background 0.25s ease,
+      border-color 0.25s ease,
+      box-shadow 0.25s ease,
+      transform 0.16s ease,
+      opacity 0.35s ease;
+  }
+
+  /* 按钮文字：古典锐利雕刻衬线字体 + 金属暗黑浮雕效果 */
+  .cyber-btn .btn-label {
+    display: inline-block;
+    font-family: 'Cinzel Decorative', 'Cinzel', 'Times New Roman', serif;
+    font-size: 0.94rem;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    background: linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #d6e0ec 30%,
+      #7c889b 50%,
+      #292f3a 56%,
+      #a8b6ca 82%,
+      #f2f7ff 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter:
+      drop-shadow(0 1px 0 rgba(5, 7, 11, 0.98))
+      drop-shadow(0 2px 3px rgba(0, 0, 0, 0.95));
+    transition: filter 0.25s ease;
+  }
+
+  /* 按钮四角冷金属切角装饰 */
+  .cyber-btn::before,
+  .cyber-btn::after {
+    content: "";
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    border-color: #cbd9ea;
+    border-style: solid;
+    pointer-events: none;
+    transition: all 0.25s ease;
+  }
+
+  .cyber-btn::before {
+    top: -1px;
+    left: -1px;
+    border-width: 1.5px 0 0 1.5px;
+  }
+
+  .cyber-btn::after {
+    bottom: -1px;
+    right: -1px;
+    border-width: 0 1.5px 1.5px 0;
+  }
+
+  .cyber-btn:hover:not(:disabled) {
+    background: linear-gradient(
+      180deg,
+      rgba(32, 44, 62, 0.92) 0%,
+      rgba(13, 19, 29, 0.95) 52%,
+      rgba(24, 34, 49, 0.92) 100%
+    );
+    border-color: rgba(212, 232, 255, 0.90);
+    box-shadow:
+      0 6px 20px rgba(0, 0, 0, 0.9),
+      0 0 22px rgba(165, 208, 250, 0.38),
+      inset 0 1px 0 rgba(255, 255, 255, 0.42),
+      inset 0 0 12px rgba(170, 205, 240, 0.18);
+    transform: translateY(-1px);
+  }
+
+  .cyber-btn:hover:not(:disabled) .btn-label {
+    filter:
+      drop-shadow(0 1px 0 rgba(5, 7, 11, 0.98))
+      drop-shadow(0 0 8px rgba(210, 232, 255, 0.48));
+  }
+
+  .cyber-btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .cyber-btn.btn-reject {
+    border-color: rgba(146, 156, 202, 0.50);
+  }
+
+  .cyber-btn.btn-reject::before,
+  .cyber-btn.btn-reject::after {
+    border-color: #aab5e2;
+  }
+
+  .cyber-btn:disabled {
+    opacity: 0.28;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .cyber-btn.is-active-saved {
+    border-color: rgba(220, 238, 255, 0.95);
+    box-shadow:
+      0 0 24px rgba(180, 220, 255, 0.46),
+      inset 0 0 12px rgba(195, 230, 255, 0.22);
+  }
+
+  @media (max-width: 640px) {
+    .identity-title {
+      white-space: normal;
+      font-size: 1.15rem;
+    }
+    .identity-subtitle {
+      font-size: 0.82rem;
+    }
+    .cyber-btn {
+      min-width: 116px;
+      padding: 8px 18px;
+    }
+    .cyber-btn .btn-label {
+      font-size: 0.82rem;
+    }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="cyber-canvas"></canvas>
+
+<!-- 光盘正下方居中的金属暗黑浮雕文字与操作按钮 -->
+<div class="ui-bottom-dock" id="uiBottomDock">
+  <div class="identity-title" id="identityTitle">YOUR IDENTITY HAS BEEN RECORDED</div>
+  <div class="identity-subtitle" id="identitySubtitle">A UNIQUE MARK OF THE ALGORITHM'S GAZE</div>
+
+  <div class="action-buttons" id="actionButtons">
+    <button type="button" class="cyber-btn btn-save" id="btnSave"><span class="btn-label">Save</span></button>
+    <button type="button" class="cyber-btn btn-reject" id="btnReject"><span class="btn-label">Reject</span></button>
+  </div>
+</div>
+
+<script>
+/**
+ * ============================================================================
+ * 顶部参数配置区 (CONFIG)
+ * ============================================================================
+ */
+const CONFIG = {
+  // 外部图片 GitHub Raw 直链（支持跨域像素读取）
+  DISC_IMAGE_URL: "https://raw.githubusercontent.com/lanksee628/my-image/e2317b540a0b52de99a0c6810652229de7ea9761/5cd.png",
+  BOX_IMAGE_URL: "https://raw.githubusercontent.com/lanksee628/my-image/e2317b540a0b52de99a0c6810652229de7ea9761/5cd%20box.png",
+  BG_REF_IMAGE_URL: "https://raw.githubusercontent.com/lanksee628/my-image/e2317b540a0b52de99a0c6810652229de7ea9761/1bg.jpg",
+
+  // 光盘与成品盒尺寸比例
+  DISC_LAYOUT: {
+    CENTER_Y_RATIO: 0.375,         // 居中偏上，给光盘和下方文字留出恰当间距
+    CANVAS_SHARE_RATIO: 0.53,      // 光盘直径占画布短边的 53%（保持正圆等比不变形）
+    BOX_SHARE_RATIO: 0.9,          // Save 后成品光盘包装盒占画布短边的 90%
+    BOX_TILT_DEG: -10.5,           // Save 后成品光盘包装盒整体倾斜覆盖的角度
+    MIN_ZOOM: 0.55,                // 滚轮最小缩放倍数
+    MAX_ZOOM: 2.40                 // 滚轮最大缩放倍数
+  },
+
+  // 周围 3D 环形轨道粒子群（围绕光盘按圆形 3D 空间轨道流动，增强立体空间感）
+  ORBITAL_3D_RING: {
+    PARTICLE_COUNT: 460,           // 环绕光盘的 3D 轨道粒子数量
+    INNER_RADIUS_MUL: 1.05,        // 内圈贴近光盘外缘（倍数）
+    OUTER_RADIUS_MUL: 1.50,        // 外圈扩散半径（倍数）
+    RING_TILT_X: 0.42,             // 3D 轨道俯仰倾角（营造前低后高的立体空间透视）
+    RING_TILT_Z: -0.18,            // 3D 轨道侧倾角
+    PERSPECTIVE_FOV: 640           // 3D 透视焦距
+  },
+
+  // 光盘本体粒子采样与凝聚/解体物理参数
+  DISC_PARTICLES: {
+    SAMPLE_LONG_SIDE: 158,         // 高密度等比采样（约 13,000+ 细密微粒）
+    INITIAL_BLUR_SPREAD: 0.24,     // 初始模糊松散圆形轮廓扩散幅度
+    CONDENSE_DURATION: 1.60,       // 鼠标移入后粒子平滑凝聚显现时长（秒）
+    GRAVITY: 255,                  // Reject 解体后的重力加速度（px/s²）
+    FADE_DURATION: 3.3             // Reject 微粒下坠变淡消散时长（秒）
+  }
+};
+
+/**
+ * ============================================================================
+ * 赛博风格光盘交互引擎（纯原生 HTML5 Canvas + JS，无第三方库，60fps 流畅运行）
+ * ============================================================================
+ */
+class CyberDiscExperience {
+  constructor() {
+    this.canvas = document.getElementById("cyber-canvas");
+    this.ctx = this.canvas.getContext("2d", { alpha: false });
+
+    this.titleEl = document.getElementById("identityTitle");
+    this.subtitleEl = document.getElementById("identitySubtitle");
+    this.buttonsEl = document.getElementById("actionButtons");
+    this.btnSave = document.getElementById("btnSave");
+    this.btnReject = document.getElementById("btnReject");
+    this.btnSaveLabel = this.btnSave.querySelector(".btn-label");
+
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    // 状态机：'FUZZY' -> 'CONDENSING' -> 'CONDENSED' -> ('SAVING' -> 'SAVED' | 'REJECTING' -> 'REJECTED')
+    this.state = "FUZZY";
+    this.condenseProgress = 0;
+    this.saveProgress = 0;
+    this.rejectElapsed = 0;
+    this.uiRevealed = false;
+    this.originalDiscEliminated = false;
+
+    // 局部光盘交互变换状态（仅对光盘局部生效）
+    this.discTransform = {
+      offsetX: 0,
+      offsetY: 0,
+      zoom: 1.0,
+      targetZoom: 1.0,
+      isDragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      dragOriginOffsetX: 0,
+      dragOriginOffsetY: 0
+    };
+
+    this.mouse = { x: -9999, y: -9999, insideDisc: false };
+
+    // 外部图像资源及其原始宽高比信息
+    this.discImg = null;
+    this.discImgLoaded = false;
+    this.discNaturalW = 500;
+    this.discNaturalH = 500;
+    this.cdDiameterNorm = 0.92;
+    this.cdCenterOffsetNormX = 0;
+    this.cdCenterOffsetNormY = 0;
+
+    this.boxImg = null;
+    this.boxImgLoaded = false;
+    this.bgRefImg = null;
+    this.bgRefImgLoaded = false;
+
+    // 离屏缓存背景画布（避免每帧重复绘制背景与滤镜，保证丝滑无卡顿）
+    this.bgCacheCanvas = document.createElement("canvas");
+    this.bgCacheCtx = this.bgCacheCanvas.getContext("2d");
+
+    // 粒子集合
+    this.orbitalParticles = [];
+    this.discParticles = [];
+    this.buttonBurstParticles = [];
+
+    // 预渲染冷灰蓝与淡紫蓝科技微光贴图
+    this.coldGlowSprite = this.createGlowSprite("rgba(225, 238, 255, 0.92)", "rgba(135, 168, 225, 0.36)");
+    this.violetGlowSprite = this.createGlowSprite("rgba(225, 220, 255, 0.90)", "rgba(148, 132, 235, 0.35)");
+
+    this.resize();
+    this.initOrbital3DRing();
+    this.loadAssets();
+    this.bindEvents();
+
+    this.lastTime = performance.now();
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  /**
+   * 预渲染小型径向微光贴图（替代高开销的实时 shadowBlur）
+   */
+  createGlowSprite(coreColor, midColor) {
+    const size = 36;
+    const c = document.createElement("canvas");
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext("2d");
+    const r = size * 0.5;
+    const g = ctx.createRadialGradient(r, r, 0, r, r, r);
+    g.addColorStop(0, coreColor);
+    g.addColorStop(0.32, midColor);
+    g.addColorStop(1, "rgba(60, 80, 125, 0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    return c;
+  }
+
+  resize() {
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
+    this.canvas.width = this.width * this.dpr;
+    this.canvas.height = this.height * this.dpr;
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+
+    this.rebuildBackgroundCache();
+  }
+
+  /**
+   * 离屏预渲染冷峻未来科技背景（融合 1bg.jpg 纹理与精密冷钢蓝数字暗场）
+   */
+  rebuildBackgroundCache() {
+    this.bgCacheCanvas.width = this.width * this.dpr;
+    this.bgCacheCanvas.height = this.height * this.dpr;
+    const bctx = this.bgCacheCtx;
+    bctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+
+    const bgGrad = bctx.createRadialGradient(
+      this.width * 0.5, this.height * CONFIG.DISC_LAYOUT.CENTER_Y_RATIO, 20,
+      this.width * 0.5, this.height * 0.5, Math.max(this.width, this.height) * 0.78
+    );
+    bgGrad.addColorStop(0, "#0c121b");
+    bgGrad.addColorStop(0.52, "#05080d");
+    bgGrad.addColorStop(1, "#020305");
+    bctx.fillStyle = bgGrad;
+    bctx.fillRect(0, 0, this.width, this.height);
+
+    // 融合参考背景图 1bg.jpg（低透明度冷峻科技质感，不干扰前景光盘）
+    if (this.bgRefImgLoaded && this.bgRefImg) {
+      bctx.save();
+      bctx.globalAlpha = 0.26;
+      if ("filter" in bctx) {
+        bctx.filter = "grayscale(72%) contrast(122%) brightness(66%)";
+      }
+      const imgRatio = this.bgRefImg.width / Math.max(1, this.bgRefImg.height);
+      const canvasRatio = this.width / Math.max(1, this.height);
+      let drawW, drawH;
+      if (canvasRatio > imgRatio) {
+        drawW = this.width;
+        drawH = this.width / imgRatio;
+      } else {
+        drawH = this.height;
+        drawW = this.height * imgRatio;
+      }
+      bctx.drawImage(
+        this.bgRefImg,
+        (this.width - drawW) * 0.5,
+        (this.height - drawH) * 0.5,
+        drawW,
+        drawH
+      );
+      bctx.restore();
+    }
+
+    // 极细腻冷峻数字网格线与同心 HUD 刻度圆环
+    bctx.save();
+    bctx.strokeStyle = "rgba(130, 158, 195, 0.035)";
+    bctx.lineWidth = 1;
+    const gridStep = 64;
+    for (let x = 0; x < this.width; x += gridStep) {
+      bctx.beginPath();
+      bctx.moveTo(x, 0);
+      bctx.lineTo(x, this.height);
+      bctx.stroke();
+    }
+    for (let y = 0; y < this.height; y += gridStep) {
+      bctx.beginPath();
+      bctx.moveTo(0, y);
+      bctx.lineTo(this.width, y);
+      bctx.stroke();
+    }
+
+    const cx = this.width * 0.5;
+    const cy = this.height * CONFIG.DISC_LAYOUT.CENTER_Y_RATIO;
+    const baseR = Math.min(this.width, this.height) * CONFIG.DISC_LAYOUT.CANVAS_SHARE_RATIO * 0.5;
+    bctx.strokeStyle = "rgba(145, 175, 220, 0.055)";
+    [1.16, 1.44, 1.76].forEach((mul) => {
+      bctx.beginPath();
+      bctx.arc(cx, cy, baseR * mul, 0, Math.PI * 2);
+      bctx.stroke();
+    });
+    bctx.restore();
+  }
+
+  /**
+   * 获取光盘图像当前在画布上的精确渲染尺寸与中心：
+   * 严格保持原始图片自然宽高比（绝不拉伸或压缩成椭圆）
+   */
+  getDiscRenderMetrics() {
+    const z = this.discTransform.zoom;
+    const targetCdDiameter = Math.min(this.width, this.height) * CONFIG.DISC_LAYOUT.CANVAS_SHARE_RATIO;
+    const aspect = this.discNaturalW / Math.max(1, this.discNaturalH);
+
+    const baseImgH = targetCdDiameter / Math.max(0.3, this.cdDiameterNorm);
+    const baseImgW = baseImgH * aspect;
+
+    const w = baseImgW * z;
+    const h = baseImgH * z;
+
+    const imgCenterX = this.width * 0.5 + this.discTransform.offsetX;
+    const imgCenterY = this.height * CONFIG.DISC_LAYOUT.CENTER_Y_RATIO + this.discTransform.offsetY;
+
+    const cdCenterX = imgCenterX + this.cdCenterOffsetNormX * w;
+    const cdCenterY = imgCenterY + this.cdCenterOffsetNormY * h;
+    const cdRadius = (targetCdDiameter * 0.5) * z;
+
+    return { imgCenterX, imgCenterY, w, h, cdCenterX, cdCenterY, cdRadius };
+  }
+
+  /**
+   * 初始化光盘周围的 3D 空间环形流动粒子
+   */
+  initOrbital3DRing() {
+    const count = CONFIG.ORBITAL_3D_RING.PARTICLE_COUNT;
+    const minMul = CONFIG.ORBITAL_3D_RING.INNER_RADIUS_MUL;
+    const maxMul = CONFIG.ORBITAL_3D_RING.OUTER_RADIUS_MUL;
+    this.orbitalParticles = [];
+
+    for (let i = 0; i < count; i++) {
+      const t = Math.pow(Math.random(), 1.32);
+      const radiusMul = minMul + t * (maxMul - minMul);
+      const angle = Math.random() * Math.PI * 2;
+      const angularSpeed = (0.32 + (1 - t) * 0.40) * (Math.random() < 0.08 ? -0.6 : 1);
+      const yOffsetMul = (Math.random() - 0.5) * 0.12;
+
+      const isViolet = Math.random() < 0.35;
+      const base = Math.round(158 + Math.random() * 88);
+      const r = isViolet ? Math.min(255, base + 12) : base;
+      const g = Math.min(255, base + 4);
+      const b = Math.min(255, base + 28);
+
+      this.orbitalParticles.push({
+        angle,
+        radiusMul,
+        angularSpeed,
+        yOffsetMul,
+        size: 1.0 + Math.random() * 1.65,
+        alpha: (0.30 + (1 - t) * 0.55) * (0.65 + Math.random() * 0.35),
+        r,
+        g,
+        b,
+        isViolet,
+        hasGlow: Math.random() < 0.14,
+        phase: Math.random() * Math.PI * 2,
+        sx: 0,
+        sy: 0,
+        z: 0,
+        scale: 1
+      });
+    }
+  }
+
+  /**
+   * 加载外部参考图片并处理外框黑底抠除与像素采样
+   */
+  loadAssets() {
+    // 1. 加载主光盘图片 5cd.png
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      this.discNaturalW = img.naturalWidth || img.width;
+      this.discNaturalH = img.naturalHeight || img.height;
+      this.discImg = this.cleanOuterBlackBackground(img);
+      this.discImgLoaded = true;
+      this.sampleDiscParticlesFromOriginalImage(this.discImg);
+    };
+    img.onerror = () => {
+      const fallbackImg = new Image();
+      fallbackImg.onload = () => {
+        this.discImg = fallbackImg;
+        this.discImgLoaded = true;
+        this.discNaturalW = fallbackImg.naturalWidth || fallbackImg.width;
+        this.discNaturalH = fallbackImg.naturalHeight || fallbackImg.height;
+        this.sampleFallbackCyberDiscParticles();
+      };
+      fallbackImg.src = CONFIG.DISC_IMAGE_URL;
+    };
+    img.src = CONFIG.DISC_IMAGE_URL;
+
+    // 2. 预加载 Save 后的成品光盘盒图片 5cd box.png
+    const boxImg = new Image();
+    boxImg.crossOrigin = "Anonymous";
+    boxImg.onload = () => {
+      this.boxImg = boxImg;
+      this.boxImgLoaded = true;
+    };
+    boxImg.onerror = () => {
+      const boxFallback = new Image();
+      boxFallback.onload = () => {
+        this.boxImg = boxFallback;
+        this.boxImgLoaded = true;
+      };
+      boxFallback.src = CONFIG.BOX_IMAGE_URL;
+    };
+    boxImg.src = CONFIG.BOX_IMAGE_URL;
+
+    // 3. 加载冷峻未来科技背景参考图 1bg.jpg 并生成离屏缓存
+    const bgImg = new Image();
+    bgImg.crossOrigin = "Anonymous";
+    bgImg.onload = () => {
+      this.bgRefImg = bgImg;
+      this.bgRefImgLoaded = true;
+      this.rebuildBackgroundCache();
+    };
+    bgImg.onerror = () => {
+      const bgFallback = new Image();
+      bgFallback.onload = () => {
+        this.bgRefImg = bgFallback;
+        this.bgRefImgLoaded = true;
+        this.rebuildBackgroundCache();
+      };
+      bgFallback.src = CONFIG.BG_REF_IMAGE_URL;
+    };
+    bgImg.src = CONFIG.BG_REF_IMAGE_URL;
+  }
+
+  /**
+   * 一次性清理原图外围可能存在的纯黑矩形底色，完整保留光盘圆形实体与细节
+   */
+  cleanOuterBlackBackground(img) {
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    const off = document.createElement("canvas");
+    off.width = w;
+    off.height = h;
+    const ctx = off.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+
+    try {
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const data = imageData.data;
+
+      const cornerAlpha = data[3];
+      const cornerLum = 0.299 * data[0] + 0.587 * data[1] + 0.114 * data[2];
+      if (cornerAlpha > 200 && cornerLum < 18) {
+        let sumX = 0, sumY = 0, count = 0;
+        for (let y = 0; y < h; y += 2) {
+          for (let x = 0; x < w; x += 2) {
+            const idx = (y * w + x) * 4;
+            const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+            if (lum > 22) {
+              sumX += x;
+              sumY += y;
+              count++;
+            }
+          }
+        }
+        if (count > 50) {
+          const cx = sumX / count;
+          const cy = sumY / count;
+          let maxR = 0;
+          for (let y = 0; y < h; y += 2) {
+            for (let x = 0; x < w; x += 2) {
+              const idx = (y * w + x) * 4;
+              const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+              if (lum > 22) {
+                const d = Math.hypot(x - cx, y - cy);
+                if (d > maxR) maxR = d;
+              }
+            }
+          }
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const idx = (y * w + x) * 4;
+              const d = Math.hypot(x - cx, y - cy);
+              if (d > maxR + 1.5) {
+                data[idx + 3] = 0;
+              } else if (d > maxR - 1.5) {
+                const edgeAlpha = Math.max(0, Math.min(1, (maxR + 1.5 - d) / 3.0));
+                data[idx + 3] = Math.round(data[idx + 3] * edgeAlpha);
+              }
+            }
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+      }
+      return off;
+    } catch (e) {
+      return img;
+    }
+  }
+
+  /**
+   * 按 5cd.png 原始宽高比完整采样像素，构建细密光盘粒子群
+   */
+  sampleDiscParticlesFromOriginalImage(sourceCanvasOrImg) {
+    const natW = this.discNaturalW;
+    const natH = this.discNaturalH;
+    const maxSide = CONFIG.DISC_PARTICLES.SAMPLE_LONG_SIDE;
+    const scale = maxSide / Math.max(natW, natH);
+    const sampleW = Math.max(32, Math.round(natW * scale));
+    const sampleH = Math.max(32, Math.round(natH * scale));
+
+    const off = document.createElement("canvas");
+    off.width = sampleW;
+    off.height = sampleH;
+    const ctx = off.getContext("2d");
+    ctx.drawImage(sourceCanvasOrImg, 0, 0, sampleW, sampleH);
+
+    let imgData;
+    try {
+      imgData = ctx.getImageData(0, 0, sampleW, sampleH).data;
+    } catch (e) {
+      this.sampleFallbackCyberDiscParticles();
+      return;
+    }
+
+    let sumX = 0, sumY = 0, count = 0;
+    const validPixels = [];
+
+    for (let y = 0; y < sampleH; y++) {
+      for (let x = 0; x < sampleW; x++) {
+        const idx = (y * sampleW + x) * 4;
+        const r = imgData[idx];
+        const g = imgData[idx + 1];
+        const b = imgData[idx + 2];
+        const a = imgData[idx + 3];
+
+        if (a < 40) continue;
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        if (lum < 14 && a < 220) continue;
+
+        sumX += x + 0.5;
+        sumY += y + 0.5;
+        count++;
+        validPixels.push({ x: x + 0.5, y: y + 0.5, r, g, b, a: a / 255 });
+      }
+    }
+
+    if (count < 50) {
+      this.sampleFallbackCyberDiscParticles();
+      return;
+    }
+
+    const cx = sumX / count;
+    const cy = sumY / count;
+    let maxDistSample = 0;
+    for (let i = 0; i < validPixels.length; i++) {
+      const vp = validPixels[i];
+      const d = Math.hypot(vp.x - cx, vp.y - cy);
+      if (d > maxDistSample) maxDistSample = d;
+    }
+
+    this.cdDiameterNorm = Math.min(1.0, (maxDistSample * 2) / sampleH);
+    this.cdCenterOffsetNormX = (cx - sampleW * 0.5) / sampleW;
+    this.cdCenterOffsetNormY = (cy - sampleH * 0.5) / sampleH;
+
+    const particles = [];
+    for (let i = 0; i < validPixels.length; i++) {
+      const vp = validPixels[i];
+      const relX = (vp.x - sampleW * 0.5) / sampleW;
+      const relY = (vp.y - sampleH * 0.5) / sampleH;
+      const rNorm = Math.min(1, Math.hypot(vp.x - cx, vp.y - cy) / Math.max(1, maxDistSample));
+
+      particles.push(this.createDiscParticleNode(relX, relY, rNorm, vp.r, vp.g, vp.b, vp.a));
+    }
+
+    this.discParticles = particles;
+  }
+
+  sampleFallbackCyberDiscParticles() {
+    const grid = 140;
+    const half = grid * 0.5;
+    const particles = [];
+    this.cdDiameterNorm = 0.92;
+    this.cdCenterOffsetNormX = 0;
+    this.cdCenterOffsetNormY = 0;
+
+    for (let y = 0; y < grid; y++) {
+      for (let x = 0; x < grid; x++) {
+        const dx = (x - half + 0.5) / half;
+        const dy = (y - half + 0.5) / half;
+        const rNorm = Math.sqrt(dx * dx + dy * dy);
+        if (rNorm > 0.99 || rNorm < 0.09) continue;
+
+        const angle = Math.atan2(dy, dx);
+        const sheen = 0.5 + 0.5 * Math.sin(angle * 2 + rNorm * 6);
+        const r = Math.round(95 + sheen * 85);
+        const g = Math.round(125 + sheen * 90);
+        const b = Math.round(185 + sheen * 55);
+        particles.push(this.createDiscParticleNode(dx * 0.46, dy * 0.46, rNorm, r, g, b, 0.95));
+      }
+    }
+    this.discParticles = particles;
+  }
+
+  createDiscParticleNode(relX, relY, rNorm, tr, tg, tb, ta) {
+    const angle = Math.atan2(relY, relX);
+    const spreadMag = CONFIG.DISC_PARTICLES.INITIAL_BLUR_SPREAD * (0.45 + Math.random() * 1.15);
+    const randAngle = Math.random() * Math.PI * 2;
+    const tangential = (Math.random() - 0.5) * 0.22;
+
+    const fuzzyRelX = relX + Math.cos(randAngle) * spreadMag - Math.sin(angle) * tangential;
+    const fuzzyRelY = relY + Math.sin(randAngle) * spreadMag + Math.cos(angle) * tangential;
+
+    // 初始粒子色调：冷灰、蓝灰、淡紫蓝
+    const palettePick = Math.random();
+    let fr, fg, fb;
+    if (palettePick < 0.35) {
+      fr = 144 + Math.random() * 26;
+      fg = 158 + Math.random() * 28;
+      fb = 182 + Math.random() * 28;
+    } else if (palettePick < 0.68) {
+      fr = 106 + Math.random() * 28;
+      fg = 136 + Math.random() * 30;
+      fb = 194 + Math.random() * 32;
+    } else {
+      fr = 150 + Math.random() * 32;
+      fg = 136 + Math.random() * 28;
+      fb = 226 + Math.random() * 28;
+    }
+
+    const edgeProgress = 1.0 - rNorm;
+    const releaseDelay = Math.max(0, edgeProgress * 0.88 + (Math.random() - 0.5) * 0.16);
+
+    return {
+      relX,
+      relY,
+      rNorm,
+      fuzzyRelX,
+      fuzzyRelY,
+      swirlAngle: (Math.random() - 0.5) * 1.75,
+      phase: Math.random() * Math.PI * 2,
+      driftAmp: 0.010 + Math.random() * 0.018,
+      fr, fg, fb,
+      tr, tg, tb, ta,
+      size: 1.05 + Math.random() * 1.05,
+      hasGlow: Math.random() < 0.075,
+      isVioletGlow: palettePick >= 0.68,
+      releaseDelay,
+      detached: false,
+      worldX: 0,
+      worldY: 0,
+      vx: 0,
+      vy: 0,
+      alpha: 1,
+      fallSize: 1.25 + Math.random() * 1.05
+    };
+  }
+
+  /**
+   * 按钮点击爆发金属微粒特效
+   */
+  spawnButtonParticles(clientX, clientY, isSave) {
+    const count = 42;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 45 + Math.random() * 175;
+      const shade = isSave ? (190 + Math.random() * 65) : (145 + Math.random() * 75);
+      this.buttonBurstParticles.push({
+        x: clientX + (Math.random() - 0.5) * 36,
+        y: clientY + (Math.random() - 0.5) * 12,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 25,
+        size: 1.2 + Math.random() * 2.1,
+        alpha: 0.95,
+        decay: 1.2 + Math.random() * 0.9,
+        r: Math.round(shade),
+        g: Math.round(Math.min(255, shade + 10)),
+        b: Math.round(Math.min(255, shade + 24))
+      });
+    }
+  }
+
+  /**
+   * 绑定光盘局部交互与按钮事件
+   */
+  bindEvents() {
+    window.addEventListener("resize", () => this.resize());
+
+    const isPointInsideDisc = (clientX, clientY) => {
+      if (this.state === "REJECTING" || this.state === "REJECTED") return false;
+      const m = this.getDiscRenderMetrics();
+      const dx = clientX - m.cdCenterX;
+      const dy = clientY - m.cdCenterY;
+      return (dx * dx + dy * dy) <= (m.cdRadius * 1.08) * (m.cdRadius * 1.08);
+    };
+
+    this.canvas.addEventListener("mousemove", (e) => {
+      this.mouse.x = e.clientX;
+      this.mouse.y = e.clientY;
+
+      if (this.discTransform.isDragging) {
+        this.discTransform.offsetX = this.discTransform.dragOriginOffsetX + (e.clientX - this.discTransform.dragStartX);
+        this.discTransform.offsetY = this.discTransform.dragOriginOffsetY + (e.clientY - this.discTransform.dragStartY);
+        this.canvas.style.cursor = "grabbing";
+        return;
+      }
+
+      const inside = isPointInsideDisc(e.clientX, e.clientY);
+      this.mouse.insideDisc = inside;
+
+      if (inside) {
+        this.canvas.style.cursor = "grab";
+        if (this.state === "FUZZY") {
+          this.state = "CONDENSING";
+        }
+      } else {
+        this.canvas.style.cursor = "default";
+      }
+    });
+
+    this.canvas.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      if (isPointInsideDisc(e.clientX, e.clientY)) {
+        this.discTransform.isDragging = true;
+        this.discTransform.dragStartX = e.clientX;
+        this.discTransform.dragStartY = e.clientY;
+        this.discTransform.dragOriginOffsetX = this.discTransform.offsetX;
+        this.discTransform.dragOriginOffsetY = this.discTransform.offsetY;
+        this.canvas.style.cursor = "grabbing";
+      }
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (this.discTransform.isDragging) {
+        this.discTransform.isDragging = false;
+        this.canvas.style.cursor = this.mouse.insideDisc ? "grab" : "default";
+      }
+    });
+
+    this.canvas.addEventListener("wheel", (e) => {
+      if (!isPointInsideDisc(e.clientX, e.clientY)) return;
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.925;
+      const nextZoom = this.discTransform.targetZoom * zoomFactor;
+      this.discTransform.targetZoom = Math.min(
+        CONFIG.DISC_LAYOUT.MAX_ZOOM,
+        Math.max(CONFIG.DISC_LAYOUT.MIN_ZOOM, nextZoom)
+      );
+    }, { passive: false });
+
+    this.buttonsEl.addEventListener("mousedown", (e) => e.stopPropagation());
+    this.buttonsEl.addEventListener("wheel", (e) => e.stopPropagation());
+
+    // Save 按钮
+    this.btnSave.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const rect = this.btnSave.getBoundingClientRect();
+      this.spawnButtonParticles(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5, true);
+
+      if (this.state !== "CONDENSED") return;
+      this.state = "SAVING";
+      this.saveProgress = 0;
+      this.btnSaveLabel.textContent = "Saved";
+      this.btnSave.classList.add("is-active-saved");
+      this.btnReject.disabled = true;
+    });
+
+    // Reject 按钮
+    this.btnReject.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const rect = this.btnReject.getBoundingClientRect();
+      this.spawnButtonParticles(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5, false);
+
+      if (this.state !== "CONDENSED") return;
+      this.startRejectDisintegration();
+    });
+  }
+
+  revealBottomUI() {
+    if (this.uiRevealed) return;
+    this.uiRevealed = true;
+    this.titleEl.classList.add("is-revealed");
+    this.subtitleEl.classList.add("is-revealed");
+    this.buttonsEl.classList.add("is-revealed");
+  }
+
+  startRejectDisintegration() {
+    this.state = "REJECTING";
+    this.rejectElapsed = 0;
+
+    this.titleEl.classList.remove("is-revealed");
+    this.subtitleEl.classList.remove("is-revealed");
+    this.buttonsEl.classList.remove("is-revealed");
+
+    const m = this.getDiscRenderMetrics();
+
+    for (let i = 0; i < this.discParticles.length; i++) {
+      const p = this.discParticles[i];
+      const wx = m.imgCenterX + p.relX * m.w;
+      const wy = m.imgCenterY + p.relY * m.h;
+
+      p.worldX = wx;
+      p.worldY = wy;
+      p.detached = false;
+      p.alpha = 0.88 + Math.random() * 0.12;
+
+      const outAngle = Math.atan2(wy - m.cdCenterY, wx - m.cdCenterX) + (Math.random() - 0.5) * 0.7;
+      const burstSpeed = 14 + Math.random() * 36;
+      p.vx = Math.cos(outAngle) * burstSpeed;
+      p.vy = Math.sin(outAngle) * (burstSpeed * 0.55) + (12 + Math.random() * 28);
+    }
+  }
+
+  loop(now) {
+    const dt = Math.min(0.05, (now - this.lastTime) * 0.001);
+    this.lastTime = now;
+
+    this.update(dt, now * 0.001);
+    this.render(now * 0.001);
+
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  update(dt, timeSec) {
+    this.discTransform.zoom += (this.discTransform.targetZoom - this.discTransform.zoom) * 0.14;
+
+    // 1. 更新围绕正圆光盘的 3D 环形轨道粒子
+    const m = this.getDiscRenderMetrics();
+    const tiltX = CONFIG.ORBITAL_3D_RING.RING_TILT_X;
+    const tiltZ = CONFIG.ORBITAL_3D_RING.RING_TILT_Z;
+    const cosX = Math.cos(tiltX);
+    const sinX = Math.sin(tiltX);
+    const cosZ = Math.cos(tiltZ);
+    const sinZ = Math.sin(tiltZ);
+    const fov = CONFIG.ORBITAL_3D_RING.PERSPECTIVE_FOV;
+
+    for (let i = 0; i < this.orbitalParticles.length; i++) {
+      const op = this.orbitalParticles[i];
+      op.angle += op.angularSpeed * dt;
+
+      const r = m.cdRadius * op.radiusMul;
+      const x0 = Math.cos(op.angle) * r;
+      const y0 = m.cdRadius * op.yOffsetMul + Math.sin(timeSec * 1.4 + op.phase) * 3.0;
+      const z0 = Math.sin(op.angle) * r;
+
+      const y1 = y0 * cosX - z0 * sinX;
+      const z1 = y0 * sinX + z0 * cosX;
+
+      const x2 = x0 * cosZ - y1 * sinZ;
+      const y2 = x0 * sinZ + y1 * cosZ;
+
+      const persp = fov / Math.max(180, fov - z1);
+      op.sx = m.cdCenterX + x2 * persp;
+      op.sy = m.cdCenterY + y2 * persp;
+      op.z = z1;
+      op.scale = persp;
+    }
+
+    // 2. 更新按钮点击爆发粒子
+    for (let i = this.buttonBurstParticles.length - 1; i >= 0; i--) {
+      const bp = this.buttonBurstParticles[i];
+      bp.x += bp.vx * dt;
+      bp.y += bp.vy * dt;
+      bp.vx *= 0.94;
+      bp.vy = bp.vy * 0.94 + 90 * dt;
+      bp.alpha -= bp.decay * dt;
+      if (bp.alpha <= 0.01) {
+        this.buttonBurstParticles.splice(i, 1);
+      }
+    }
+
+    // 3. 更新光盘主体状态机
+    if (this.state === "CONDENSING") {
+      this.condenseProgress += dt / CONFIG.DISC_PARTICLES.CONDENSE_DURATION;
+      if (this.condenseProgress >= 1) {
+        this.condenseProgress = 1;
+        this.state = "CONDENSED";
+        this.revealBottomUI();
+      }
+    } else if (this.state === "SAVING") {
+      this.saveProgress += dt / 0.65;
+      if (this.saveProgress >= 1) {
+        this.saveProgress = 1;
+        this.state = "SAVED";
+        this.originalDiscEliminated = true;
+        this.discParticles = [];
+      }
+    } else if (this.state === "REJECTING") {
+      this.rejectElapsed += dt;
+      const g = CONFIG.DISC_PARTICLES.GRAVITY;
+      let anyVisible = false;
+
+      for (let i = 0; i < this.discParticles.length; i++) {
+        const p = this.discParticles[i];
+        if (!p.detached && this.rejectElapsed >= p.releaseDelay) {
+          p.detached = true;
+        }
+        if (p.detached) {
+          p.vy += g * dt * (0.65 + (i % 7) * 0.08);
+          p.vx *= 0.992;
+          p.vx += Math.sin(timeSec * 2.4 + p.phase) * 14 * dt;
+
+          p.worldX += p.vx * dt;
+          p.worldY += p.vy * dt;
+          p.alpha -= (dt / CONFIG.DISC_PARTICLES.FADE_DURATION) * (0.75 + (i % 5) * 0.12);
+
+          if (p.alpha > 0.01 && p.worldY < this.height + 60) {
+            anyVisible = true;
+          }
+        } else {
+          anyVisible = true;
+        }
+      }
+
+      if (!anyVisible) {
+        this.state = "REJECTED";
+        this.discParticles = [];
+      }
+    }
+  }
+
+  render(timeSec) {
+    const ctx = this.ctx;
+
+    // 1. 绘制离屏缓存的冷峻科技背景（1bg.jpg + 数字网格，无背景流动粒子）
+    ctx.drawImage(this.bgCacheCanvas, 0, 0, this.width, this.height);
+
+    // 2. 光盘后半圈 3D 环绕粒子（z < 0，位于光盘背面营造纵深空间感）
+    if (this.state !== "REJECTED") {
+      this.renderOrbitalRingPass(ctx, false);
+    }
+
+    // 3. 绘制光盘主体（居中展示，严格保持原图正圆比例，初始为模糊粒子轮廓）
+    if (this.state === "FUZZY" || this.state === "CONDENSING") {
+      this.renderFuzzyOrCondensingDisc(ctx, timeSec);
+    } else if (this.state === "CONDENSED") {
+      this.renderSolidDisc(ctx, 1.0);
+    } else if (this.state === "SAVING") {
+      if (!this.originalDiscEliminated) {
+        this.renderSolidDisc(ctx, Math.max(0, 1 - this.saveProgress * 1.35));
+      }
+      this.renderSavedBox(ctx, this.saveProgress);
+    } else if (this.state === "SAVED") {
+      this.renderSavedBox(ctx, 1.0);
+    } else if (this.state === "REJECTING") {
+      this.renderRejectingDisc(ctx);
+    }
+
+    // 4. 光盘前半圈 3D 环绕粒子（z >= 0，越过光盘前方，近大远小立体环绕）
+    if (this.state !== "REJECTED") {
+      this.renderOrbitalRingPass(ctx, true);
+    }
+
+    // 5. 按钮点击粒子特效层
+    this.renderButtonBurstParticles(ctx);
+  }
+
+  /**
+   * 分前后景深绘制围绕光盘的 3D 空间环形流动粒子
+   */
+  renderOrbitalRingPass(ctx, isFrontPass) {
+    const fadeMul = this.state === "REJECTING" ? Math.max(0, 1 - this.rejectElapsed * 1.2) : 1;
+    if (fadeMul <= 0.01) return;
+
+    ctx.save();
+    for (let i = 0; i < this.orbitalParticles.length; i++) {
+      const op = this.orbitalParticles[i];
+      if (isFrontPass ? op.z < 0 : op.z >= 0) continue;
+
+      const depthAlpha = isFrontPass ? (0.78 + 0.22 * op.scale) : (0.34 * op.scale);
+      const alpha = Math.min(0.95, op.alpha * depthAlpha * fadeMul);
+      const sz = Math.max(0.8, op.size * op.scale * Math.sqrt(this.discTransform.zoom));
+
+      ctx.fillStyle = `rgba(${op.r},${op.g},${op.b},${alpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(op.sx, op.sy, sz * 0.65, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (op.hasGlow && isFrontPass && alpha > 0.2) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = alpha * 0.35;
+        const gs = 7.0 * op.scale;
+        const sprite = op.isViolet ? this.violetGlowSprite : this.coldGlowSprite;
+        ctx.drawImage(sprite, op.sx - gs, op.sy - gs, gs * 2, gs * 2);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * 渲染初始模糊粒子轮廓 & 鼠标悬停后的平滑磁性凝聚过程
+   */
+  renderFuzzyOrCondensingDisc(ctx, timeSec) {
+    const m = this.getDiscRenderMetrics();
+    const rawP = this.condenseProgress;
+    const easeP = rawP === 0 ? 0 : 1 - Math.pow(1 - rawP, 3.2);
+
+    if (easeP > 0.50 && this.discImgLoaded) {
+      const imgAlpha = Math.min(1, (easeP - 0.50) / 0.50);
+      this.renderSolidDisc(ctx, imgAlpha);
+    }
+
+    const particleGlobalAlpha = easeP > 0.72 ? Math.max(0, 1 - (easeP - 0.72) / 0.28) : 1.0;
+    if (particleGlobalAlpha <= 0.01) return;
+
+    const ghostSpread = (1 - easeP) * 11 * this.discTransform.zoom;
+
+    ctx.save();
+    for (let i = 0; i < this.discParticles.length; i++) {
+      const p = this.discParticles[i];
+
+      const driftScale = 1 - easeP;
+      const driftX = Math.cos(timeSec * 1.25 + p.phase) * p.driftAmp * driftScale;
+      const driftY = Math.sin(timeSec * 1.15 + p.phase) * p.driftAmp * driftScale;
+
+      const curRelX = p.fuzzyRelX + (p.relX - p.fuzzyRelX) * easeP + driftX;
+      const curRelY = p.fuzzyRelY + (p.relY - p.fuzzyRelY) * easeP + driftY;
+
+      let px = m.imgCenterX + curRelX * m.w;
+      let py = m.imgCenterY + curRelY * m.h;
+
+      if (easeP > 0 && easeP < 1) {
+        const vortex = p.swirlAngle * Math.sin(easeP * Math.PI) * 0.22;
+        const cv = Math.cos(vortex);
+        const sv = Math.sin(vortex);
+        const dx = px - m.cdCenterX;
+        const dy = py - m.cdCenterY;
+        px = m.cdCenterX + (dx * cv - dy * sv);
+        py = m.cdCenterY + (dx * sv + dy * cv);
+      }
+
+      const r = Math.round(p.fr + (p.tr - p.fr) * easeP);
+      const g = Math.round(p.fg + (p.tg - p.fg) * easeP);
+      const b = Math.round(p.fb + (p.tb - p.fb) * easeP);
+      const alpha = (0.36 + 0.62 * easeP) * p.ta * particleGlobalAlpha;
+
+      const pSize = p.size * (0.85 + 0.35 * easeP) * Math.sqrt(this.discTransform.zoom);
+
+      ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+      ctx.fillRect(px - pSize * 0.5, py - pSize * 0.5, pSize, pSize);
+
+      if (ghostSpread > 0.8 && (i & 3) === 0) {
+        ctx.fillStyle = `rgba(${r},${g},${b},${(alpha * 0.28).toFixed(3)})`;
+        ctx.fillRect(px + ghostSpread, py - ghostSpread * 0.45, pSize * 1.15, pSize * 1.15);
+      }
+
+      if (p.hasGlow && alpha > 0.15) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = alpha * 0.34;
+        const gs = 7.5 * Math.sqrt(this.discTransform.zoom);
+        const sprite = p.isVioletGlow ? this.violetGlowSprite : this.coldGlowSprite;
+        ctx.drawImage(sprite, px - gs, py - gs, gs * 2, gs * 2);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * 绘制完整清晰的赛博光盘图片（5cd.png，居中展示，正圆等比不变形）
+   */
+  renderSolidDisc(ctx, opacity) {
+    if (!this.discImgLoaded || opacity <= 0.01) return;
+
+    const m = this.getDiscRenderMetrics();
+
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.drawImage(
+      this.discImg,
+      m.imgCenterX - m.w * 0.5,
+      m.imgCenterY - m.h * 0.5,
+      m.w,
+      m.h
+    );
+    ctx.restore();
+  }
+
+  /**
+   * 绘制 Save 后的整体倾斜静态成品 CD 包装图片（5cd box.png，放大覆盖其上）
+   */
+  renderSavedBox(ctx, progress) {
+    if (!this.boxImgLoaded) return;
+
+    const ease = 1 - Math.pow(1 - Math.min(1, progress), 3);
+    const m = this.getDiscRenderMetrics();
+    const tiltRad = (CONFIG.DISC_LAYOUT.BOX_TILT_DEG * Math.PI) / 180;
+    const entryScale = 1.07 - 0.07 * ease;
+
+    ctx.save();
+    ctx.translate(m.cdCenterX, m.cdCenterY);
+    ctx.rotate(tiltRad);
+    ctx.scale(entryScale, entryScale);
+    ctx.globalAlpha = ease;
+
+    const boxNatW = this.boxImg.naturalWidth || this.boxImg.width;
+    const boxNatH = this.boxImg.naturalHeight || this.boxImg.height;
+    const aspect = boxNatW / Math.max(1, boxNatH);
+
+    const targetBoxSize = Math.min(this.width, this.height) * CONFIG.DISC_LAYOUT.BOX_SHARE_RATIO * this.discTransform.zoom;
+    let boxW, boxH;
+    if (aspect >= 1) {
+      boxW = targetBoxSize;
+      boxH = targetBoxSize / aspect;
+    } else {
+      boxH = targetBoxSize;
+      boxW = targetBoxSize * aspect;
+    }
+
+    ctx.drawImage(this.boxImg, -boxW * 0.5, -boxH * 0.5, boxW, boxH);
+    ctx.restore();
+  }
+
+  /**
+   * 绘制 Reject 后的边缘渐进破碎 + 重力下坠微粒消散过程
+   */
+  renderRejectingDisc(ctx) {
+    const m = this.getDiscRenderMetrics();
+
+    const coreShrink = Math.max(0, 1 - this.rejectElapsed / 0.88);
+    if (coreShrink > 0.02 && this.discImgLoaded) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(m.cdCenterX, m.cdCenterY, m.cdRadius * coreShrink, 0, Math.PI * 2);
+      ctx.clip();
+
+      ctx.globalAlpha = Math.min(1, coreShrink * 1.3);
+      ctx.drawImage(
+        this.discImg,
+        m.imgCenterX - m.w * 0.5,
+        m.imgCenterY - m.h * 0.5,
+        m.w,
+        m.h
+      );
+      ctx.restore();
+    }
+
+    ctx.save();
+    for (let i = 0; i < this.discParticles.length; i++) {
+      const p = this.discParticles[i];
+      if (p.alpha <= 0.01 || p.worldY > this.height + 60) continue;
+
+      if (!p.detached) {
+        if (this.rejectElapsed >= p.releaseDelay - 0.14) {
+          const r = Math.round(p.fr);
+          const g = Math.round(p.fg);
+          const b = Math.round(p.fb);
+          ctx.fillStyle = `rgba(${r},${g},${b},0.85)`;
+          ctx.fillRect(p.worldX - 1, p.worldY - 1, 2, 2);
+        }
+      } else {
+        const r = Math.round(p.fr);
+        const g = Math.round(p.fg);
+        const b = Math.round(p.fb);
+        const sz = p.fallSize * Math.sqrt(this.discTransform.zoom);
+
+        ctx.fillStyle = `rgba(${r},${g},${b},${Math.max(0, p.alpha).toFixed(3)})`;
+        ctx.fillRect(p.worldX - sz * 0.5, p.worldY - sz * 0.5, sz, sz);
+
+        if (p.hasGlow && p.alpha > 0.12) {
+          ctx.globalCompositeOperation = "lighter";
+          ctx.globalAlpha = p.alpha * 0.30;
+          const sprite = p.isVioletGlow ? this.violetGlowSprite : this.coldGlowSprite;
+          ctx.drawImage(sprite, p.worldX - 6, p.worldY - 6, 12, 12);
+          ctx.globalCompositeOperation = "source-over";
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * 渲染按钮点击时的金属微粒飞溅特效
+   */
+  renderButtonBurstParticles(ctx) {
+    if (this.buttonBurstParticles.length === 0) return;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < this.buttonBurstParticles.length; i++) {
+      const bp = this.buttonBurstParticles[i];
+      ctx.fillStyle = `rgba(${bp.r},${bp.g},${bp.b},${Math.max(0, bp.alpha).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(bp.x, bp.y, bp.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  new CyberDiscExperience();
+});
+</script>
+</body>
+</html>
